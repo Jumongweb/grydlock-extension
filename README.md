@@ -12,7 +12,7 @@
 
 This is the product. It runs entirely in the user's browser. It hooks the wallet signing flow, decodes the pending transaction, requests a risk score for the destination, and renders a four-tier warning. It never blocks — it warns, and the user decides.
 
-> **Status:** Early build. The popup renders a live stub score across four tiers. Real signing interception and a live score connection are **not yet built** — see the roadmap.
+> **Status:** Early build. A Freighter `signTransaction` proxy decodes the destination, routes it through the oracle adapter, and shows the warning before signing. A live oracle connection is **not yet built** — see the roadmap.
 
 ## What it does
 
@@ -135,7 +135,7 @@ All four run in CI (`.github/workflows/ci.yml`) on every push to `main` and on e
 
 - [x] Popup renders one score across the four tiers. _(stub)_
 - [x] Fetch the score through the oracle adapter (stub score) — prove the query path end to end.
-- [ ] Freighter interception: proxy `signTransaction`, decode the XDR, extract the destination, route it through the adapter.
+- [x] Freighter interception: proxy `signTransaction`, decode the XDR, extract the destination, route it through the adapter.
 - [ ] Swap the stub score for a live one from the adapter.
 - [ ] Generalise interception beyond Freighter.
 
