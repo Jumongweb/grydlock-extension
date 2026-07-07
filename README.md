@@ -1,5 +1,6 @@
 # Gryd Lock 🔒
 
+[![CI](https://github.com/Gryd-lock/grydlock-extension/actions/workflows/ci.yml/badge.svg)](https://github.com/Gryd-lock/grydlock-extension/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-unspecified-lightgrey.svg)]()
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)]()
 [![Built with TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178c6?logo=typescript&logoColor=white)]()
@@ -109,7 +110,8 @@ src/popup/main.tsx  ── mounts ──▶  src/popup/App.tsx
   `manifest.json` into `dist/`, so the built `dist/manifest.json`'s `default_popup` path matches
   the built output layout (`dist/src/popup/index.html`).
 - **Tests**: `src/adapter/oracleAdapter.test.ts` and `src/lib/tiers.test.ts` cover the scoring and
-  tiering logic independently of the UI.
+  tiering logic; `src/popup/App.test.tsx` covers the popup's loading/error/retry states and the
+  dev-slider override, rendered with `@testing-library/react` against a mocked adapter.
 
 ## Develop
 
@@ -117,6 +119,17 @@ src/popup/main.tsx  ── mounts ──▶  src/popup/App.tsx
 2. `npm run build` (or `npm run dev` for a local dev server).
 3. Go to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, select the `dist/` output.
 4. Open the popup. The score comes from the adapter stub; in dev builds, drag the dev control to see all four tiers.
+
+## Quality Gates
+
+```bash
+npm run lint       # ESLint
+npm run typecheck  # tsc --noEmit
+npm test           # Vitest
+npm run build      # tsc -b && vite build
+```
+
+All four run in CI (`.github/workflows/ci.yml`) on every push to `main` and on every pull request.
 
 ## Roadmap
 
