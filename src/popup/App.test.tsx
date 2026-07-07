@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import App from './App'
 import * as adapter from '../adapter/oracleAdapter'
@@ -42,5 +42,67 @@ describe('App', () => {
     await screen.findByText('Low risk')
     fireEvent.change(screen.getByLabelText(/dev: override score/i), { target: { value: '90' } })
     expect(await screen.findByText('Critical risk')).toBeInTheDocument()
+  })
+})
+
+describe('App in intercept mode', () => {
+  const originalChrome = globalThis.chrome
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    // @ts-expect-error test-only stub of the chrome extension API
+    globalThis.chrome = { runtime: { sendMessage: vi.fn() } }
+  })
+
+  afterEach(() => {
+    globalThis.chrome = originalChrome
+    window.history.pushState(null, '', '/')
+  })
+
+  it('renders the tier from URL params without calling the adapter', () => {
+    const getScoreSpy = vi.spyOn(adapter, 'getScore')
+    window.history.pushState(
+      null,
+      '',
+      '?mode=intercept&requestId=req-1&destination=GDEST&score=85',
+    )
+    render(<App />)
+    expect(screen.getByText('Critical risk')).toBeInTheDocument()
+    expect(screen.getByText('GDEST')).toBeInTheDocument()
+    expect(getScoreSpy).not.toHaveBeenCalled()
+  })
+
+  it('sends the decision and closes on Proceed', () => {
+    window.history.pushState(
+      null,
+      '',
+      '?mode=intercept&requestId=req-1&destination=GDEST&score=10',
+    )
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+    render(<App />)
+    fireEvent.click(screen.getByText('Proceed'))
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'DECISION_MADE',
+      requestId: 'req-1',
+      decision: 'proceed',
+    })
+    expect(closeSpy).toHaveBeenCalled()
+  })
+
+  it('sends cancel and closes on Cancel', () => {
+    window.history.pushState(
+      null,
+      '',
+      '?mode=intercept&requestId=req-1&destination=GDEST&score=10',
+    )
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+    render(<App />)
+    fireEvent.click(screen.getByText('Cancel'))
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'DECISION_MADE',
+      requestId: 'req-1',
+      decision: 'cancel',
+    })
+    expect(closeSpy).toHaveBeenCalled()
   })
 })
