@@ -28,7 +28,9 @@ describe('App', () => {
   })
 
   it('retries the adapter call when Retry is clicked', async () => {
-    vi.spyOn(adapter, 'getScore').mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce(10)
+    vi.spyOn(adapter, 'getScore')
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce(10)
     render(<App />)
     fireEvent.click(await screen.findByText('Retry'))
     expect(await screen.findByText('Low risk')).toBeInTheDocument()
