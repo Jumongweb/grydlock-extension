@@ -13,6 +13,13 @@ body {
   margin: 0 0 8px;
 }
 
+.destination {
+  font-size: 11px;
+  color: #666;
+  word-break: break-all;
+  margin: 0 0 8px;
+}
+
 .score {
   font-weight: 600;
   margin: 0 0 4px;

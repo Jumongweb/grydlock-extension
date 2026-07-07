@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { getScore } from '../adapter/oracleAdapter'
 import { tierForScore } from '../lib/tiers'
 import DevScoreSlider from './DevScoreSlider'
+import TierWarning from './TierWarning'
+import type { RuntimeDecisionMadeMessage } from '../intercept/protocol'
 import './App.css'
 
 const PLACEHOLDER_DESTINATION = 'GABCDEXAMPLE0000000000000000000000000000000000000000000'
@@ -9,6 +11,38 @@ const PLACEHOLDER_DESTINATION = 'GABCDEXAMPLE00000000000000000000000000000000000
 type LoadState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; score: number }
 
 export default function App() {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('mode') === 'intercept') {
+    return <InterceptView params={params} />
+  }
+  return <DevPreview />
+}
+
+function InterceptView({ params }: { params: URLSearchParams }) {
+  const requestId = params.get('requestId') ?? ''
+  const destination = params.get('destination') ?? ''
+  const asset = params.get('asset') ?? undefined
+  const score = Number(params.get('score') ?? '0')
+  const tier = tierForScore(score)
+
+  function respond(decision: 'proceed' | 'cancel') {
+    const message: RuntimeDecisionMadeMessage = { type: 'DECISION_MADE', requestId, decision }
+    chrome.runtime.sendMessage(message)
+    window.close()
+  }
+
+  return (
+    <TierWarning
+      tier={tier}
+      score={score}
+      destination={asset ? `${destination} (${asset})` : destination}
+      onCancel={() => respond('cancel')}
+      onProceed={() => respond('proceed')}
+    />
+  )
+}
+
+function DevPreview() {
   const [attempt, setAttempt] = useState(0)
   return <ScoreView key={attempt} onRetry={() => setAttempt((n) => n + 1)} />
 }
@@ -50,19 +84,14 @@ function ScoreView({ onRetry }: { onRetry: () => void }) {
   const tier = tierForScore(displayScore)
 
   return (
-    <div className="popup" style={{ borderTop: `4px solid ${tier.colour}` }}>
-      <h1>{tier.label} risk</h1>
-      <p className="score">Score: {displayScore}</p>
-      <p className="message">{tier.message}</p>
-      <div className="actions">
-        <button className="cancel" onClick={() => window.close()}>
-          Cancel
-        </button>
-        <button className="proceed" onClick={() => window.close()}>
-          Proceed
-        </button>
-      </div>
-      {import.meta.env.DEV && <DevScoreSlider score={displayScore} onChange={setDevOverride} />}
-    </div>
+    <TierWarning
+      tier={tier}
+      score={displayScore}
+      onCancel={() => window.close()}
+      onProceed={() => window.close()}
+      devControl={
+        import.meta.env.DEV && <DevScoreSlider score={displayScore} onChange={setDevOverride} />
+      }
+    />
   )
 }
