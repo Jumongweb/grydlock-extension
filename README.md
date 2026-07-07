@@ -61,64 +61,90 @@ The risk score itself is fetched through [`grydlock-oracle-adapter`](../grydlock
 
 ```
 grydlock-extension/
-├── manifest.json          # MV3, popup only
+├── manifest.json             # MV3 — popup, background service worker, content scripts
+├── scripts/
+│   └── build-extension.mjs   # esbuild bundle for background.js / mainWorld.js / bridge.js
 ├── src/
-│   ├── adapter/            # Oracle adapter stub — getScore(destination)
-│   ├── lib/                # Score → tier mapping
-│   └── popup/              # React warning UI (App, dev slider, HTML/entry)
-│       ├── intercept/      # Freighter signing proxy  (phase 2, not yet built)
-│       └── decode/         # XDR → destination extraction  (phase 2, not yet built)
+│   ├── adapter/                # Oracle adapter stub — getScore(destination)
+│   ├── background/             # Service worker: decodes XDR, scores, opens the warning popup
+│   ├── decode/                  # XDR → destination extraction (Stellar SDK)
+│   ├── intercept/                # Freighter signTransaction proxy + message-bridge protocol
+│   ├── lib/                       # Score → tier mapping
+│   └── popup/                      # React warning UI — default (dev) and intercept modes
 └── README.md
 ```
 
 ## How the Pieces Connect
 
+**Toolbar click (dev/testing)** — unchanged from the stub-only build:
+
 ```
 manifest.json (action.default_popup)
         │
         ▼
-src/popup/index.html
-        │
-        ▼
-src/popup/main.tsx  ── mounts ──▶  src/popup/App.tsx
+src/popup/index.html → main.tsx → App.tsx (default mode)
                                         │
-                                        ├─▶ src/adapter/oracleAdapter.ts
-                                        │     getScore(destination) → Promise<number>
-                                        │     (stub standing in for the real
-                                        │      grydlock-oracle-adapter package)
-                                        │
-                                        ├─▶ src/lib/tiers.ts
-                                        │     tierForScore(score) → { tier, label, colour, message }
-                                        │
-                                        └─▶ src/popup/DevScoreSlider.tsx
-                                              (dev-only, gated on import.meta.env.DEV;
-                                               overrides the displayed score so all four
-                                               tiers can be exercised without the adapter)
+                                        ├─▶ src/adapter/oracleAdapter.ts → getScore(destination)
+                                        ├─▶ src/lib/tiers.ts → tierForScore(score)
+                                        └─▶ src/popup/DevScoreSlider.tsx (dev-only override)
 ```
 
-- **Entry point**: `manifest.json` points Chrome at `src/popup/index.html` as the popup.
-- **Bootstrap**: `index.html` loads `main.tsx`, which mounts `App.tsx` into `#root`.
-- **Scoring**: on mount, `App.tsx` calls `getScore()` from `src/adapter/oracleAdapter.ts` for a
-  placeholder destination. This is the only source of the displayed score — nothing is hardcoded
-  in the popup.
-- **Tiering**: the resolved score is passed through `tierForScore()` in `src/lib/tiers.ts`, which
-  maps it to one of the four tiers above with a label, colour, and message.
-- **Dev testing**: in dev builds, `DevScoreSlider.tsx` renders below the tier UI and lets a
-  developer override the displayed score locally, so all four tiers are reachable without waiting
-  on real adapter data.
-- **Build**: `vite.config.ts` builds `src/popup/index.html` as the only entry and copies
-  `manifest.json` into `dist/`, so the built `dist/manifest.json`'s `default_popup` path matches
-  the built output layout (`dist/src/popup/index.html`).
-- **Tests**: `src/adapter/oracleAdapter.test.ts` and `src/lib/tiers.test.ts` cover the scoring and
-  tiering logic; `src/popup/App.test.tsx` covers the popup's loading/error/retry states and the
-  dev-slider override, rendered with `@testing-library/react` against a mocked adapter.
+**Real Freighter signing** — a dApp page calls `window.freighterApi.signTransaction(xdr)`:
+
+```
+src/intercept/mainWorldEntry.ts    (MAIN world; wraps signTransaction, forwards the raw xdr)
+        │  window.postMessage
+        ▼
+src/intercept/bridgeEntry.ts      (isolated world; only place with chrome.* API access)
+        │  chrome.runtime.sendMessage
+        ▼
+src/background/background.ts      (service worker)
+        │
+        ├─▶ src/decode/decodeTransaction.ts → extractDestination(xdr)
+        │      no single destination? → outcome 'allow', nothing shown, original call proceeds
+        │
+        ├─▶ src/adapter/oracleAdapter.ts → getScore(destination)
+        │
+        └─▶ chrome.windows.create(popup?mode=intercept&requestId&destination&score)
+                   │
+                   ▼
+             src/popup/App.tsx (intercept mode) renders the tier + destination + Proceed/Cancel
+                   │  chrome.runtime.sendMessage({ type: 'DECISION_MADE', ... })
+                   ▼
+        background resolves the pending request → bridge → mainWorld
+                   │
+                   ▼
+        'cancel'            → throws; the real signTransaction is never called
+        'proceed' / 'allow' → the real signTransaction(xdr, opts) is called
+```
+
+- **Why the split**: `mainWorldEntry.ts` runs in the page's own JS context (needed to reach
+  `window.freighterApi`) but has no `chrome.*` API access there; `bridgeEntry.ts` runs alongside it
+  in the isolated content-script world and is the only piece that can talk to the extension via
+  `chrome.runtime`. Decoding and scoring happen in the background worker rather than in
+  `mainWorldEntry.ts` so the Stellar SDK ships once per browser session instead of being injected
+  into every page (`mainWorld.js` is ~1.6&nbsp;KB; the SDK lives in `background.js` instead).
+- **Pure logic**: `src/intercept/resolveOutcome.ts` is the testable core — given a decode function,
+  a score function, and a decision function, it returns `'allow' | 'proceed' | 'cancel'` with no
+  Chrome APIs involved, so it's covered by ordinary Vitest unit tests.
+- **Graceful degradation**: transactions with no single determinable destination (malformed XDR, no
+  destination-bearing operation, or multiple distinct destinations) resolve to `'allow'` — Gryd Lock
+  never blocks what it can't assess.
+- **Tests**: `src/decode/decodeTransaction.test.ts` and `src/intercept/resolveOutcome.test.ts` cover
+  the decode/scoring/decision logic directly; `src/adapter/oracleAdapter.test.ts` and
+  `src/lib/tiers.test.ts` cover the adapter stub and tier mapping; `src/popup/App.test.tsx` covers
+  both the popup's default (loading/error/retry/dev-slider) and intercept-mode rendering, against a
+  mocked adapter and a stubbed `chrome.runtime`.
 
 ## Develop
 
 1. `npm install`
-2. `npm run build` (or `npm run dev` for a local dev server).
+2. `npm run build` (or `npm run dev` for a local dev server against the default/dev popup only —
+   the content scripts and background worker require a real `chrome://extensions` load).
 3. Go to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, select the `dist/` output.
-4. Open the popup. The score comes from the adapter stub; in dev builds, drag the dev control to see all four tiers.
+4. Open the popup from the toolbar to exercise the dev/testing flow — the score comes from the
+   adapter stub, and in dev builds the dev control lets you drag through all four tiers. To exercise
+   real interception, visit a page with Freighter installed and call `signTransaction`.
 
 ## Quality Gates
 
@@ -126,7 +152,7 @@ src/popup/main.tsx  ── mounts ──▶  src/popup/App.tsx
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
 npm test           # Vitest
-npm run build      # tsc -b && vite build
+npm run build      # tsc -b && vite build && node scripts/build-extension.mjs
 ```
 
 All four run in CI (`.github/workflows/ci.yml`) on every push to `main` and on every pull request.
