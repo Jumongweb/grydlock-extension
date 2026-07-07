@@ -9,13 +9,16 @@ const PLACEHOLDER_DESTINATION = 'GABCDEXAMPLE00000000000000000000000000000000000
 type LoadState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; score: number }
 
 export default function App() {
+  const [attempt, setAttempt] = useState(0)
+  return <ScoreView key={attempt} onRetry={() => setAttempt((n) => n + 1)} />
+}
+
+function ScoreView({ onRetry }: { onRetry: () => void }) {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [devOverride, setDevOverride] = useState<number | null>(null)
-  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    setState({ status: 'loading' })
     getScore(PLACEHOLDER_DESTINATION)
       .then((score) => {
         if (!cancelled) setState({ status: 'ready', score })
@@ -26,7 +29,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [attempt])
+  }, [])
 
   if (state.status === 'loading') {
     return <div className="popup">Checking destination…</div>
@@ -36,7 +39,7 @@ export default function App() {
     return (
       <div className="popup">
         <p className="message">Could not reach the risk oracle.</p>
-        <button className="proceed" onClick={() => setAttempt((n) => n + 1)}>
+        <button className="proceed" onClick={onRetry}>
           Retry
         </button>
       </div>
