@@ -147,7 +147,10 @@ src/background/background.ts      (service worker)
   the decode/scoring/decision logic directly; `src/adapter/oracleAdapter.test.ts` and
   `src/lib/tiers.test.ts` cover the adapter stub and tier mapping; `src/popup/App.test.tsx` covers
   both the popup's default (loading/error/retry/dev-slider) and intercept-mode rendering, against a
-  mocked adapter and a stubbed `chrome.runtime`.
+  mocked adapter and a stubbed `chrome.runtime`. `e2e/signTransaction.spec.ts` builds on that with a
+  real Chromium extension load from `dist/`, drives a Freighter-shaped `SUBMIT_TRANSACTION`
+  `postMessage`, clicks the actual popup, and verifies both proceed and cancel outcomes across the
+  `mainWorldEntry.ts` → `bridgeEntry.ts` → `background.ts` wiring.
 
 ## Develop
 
@@ -166,9 +169,10 @@ npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
 npm test           # Vitest
 npm run build      # tsc -b && vite build && node scripts/build-extension.mjs
+npm run test:e2e   # Playwright, loading dist/ into Chromium
 ```
 
-All four run in CI (`.github/workflows/ci.yml`) on every push to `main` and on every pull request.
+All five run in CI (`.github/workflows/ci.yml`) on every push to `main` and on every pull request.
 
 ## Roadmap
 
