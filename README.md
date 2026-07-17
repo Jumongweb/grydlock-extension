@@ -108,14 +108,14 @@ src/intercept/bridgeEntry.ts      (isolated world; only place with chrome.* API 
 src/background/background.ts      (service worker)
         │
         ├─▶ src/decode/decodeTransaction.ts → extractDestination(xdr)
-        │      no single destination? → outcome 'allow', nothing shown, request passes through
+        │      returns all distinct destinations, not just one
         │
-        ├─▶ src/adapter/oracleAdapter.ts → getScore(destination)
+        ├─▶ each destination scored independently via src/adapter/oracleAdapter.ts
         │
-        └─▶ chrome.windows.create(popup?mode=intercept&requestId&destination&score)
+        └─▶ worst-tier destination opens the popup with all destinations
                    │
                    ▼
-             src/popup/App.tsx (intercept mode) renders the tier + destination + Proceed/Cancel
+             src/popup/App.tsx (intercept mode) renders tier + worst-score + every destination
                    │  chrome.runtime.sendMessage({ type: 'DECISION_MADE', ... })
                    ▼
         background resolves the pending request → bridge → mainWorld
@@ -140,9 +140,8 @@ src/background/background.ts      (service worker)
 - **Pure logic**: `src/intercept/resolveOutcome.ts` is the testable core — given a decode function,
   a score function, and a decision function, it returns `'allow' | 'proceed' | 'cancel'` with no
   Chrome APIs involved, so it's covered by ordinary Vitest unit tests.
-- **Graceful degradation**: transactions with no single determinable destination (malformed XDR, no
-  destination-bearing operation, or multiple distinct destinations) resolve to `'allow'` — Gryd Lock
-  never blocks what it can't assess.
+- **Per-destination risk assessment**: transactions can now contain multiple distinct payment destinations. Each destination is scored independently, and the highest-risk tier drives the visible warning. The popup shows every destination being paid so a malicious entry cannot be hidden by surrounding low-risk payments.
+- **Graceful degradation**: transactions with no determinable destinations (malformed XDR, no destination-bearing operation) still resolve to `'allow'` — Gryd Lock never blocks what it can't assess.
 - **Tests**: `src/decode/decodeTransaction.test.ts` and `src/intercept/resolveOutcome.test.ts` cover
   the decode/scoring/decision logic directly; `src/adapter/oracleAdapter.test.ts` and
   `src/lib/tiers.test.ts` cover the adapter stub and tier mapping; `src/popup/App.test.tsx` covers
