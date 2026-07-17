@@ -1,9 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { Account, Asset, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk'
+import { Account, Asset, Keypair, Networks, Operation, TransactionBuilder, StrKey } from '@stellar/stellar-sdk'
 import { extractDestination } from './decodeTransaction'
 
 const SOURCE = Keypair.random().publicKey()
+const CONTRACT_A = StrKey.encodeContract(Buffer.alloc(32, 0xab))
+const CONTRACT_B = StrKey.encodeContract(Buffer.alloc(32, 0xcd))
 const DEST_A = Keypair.random().publicKey()
 const DEST_B = Keypair.random().publicKey()
 const ISSUER = Keypair.random().publicKey()
@@ -21,13 +23,14 @@ function buildXdr(operations: ReturnType<typeof Operation.payment>[]) {
 describe('extractDestination', () => {
   it('extracts the destination from a single native payment', () => {
     const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' })])
-    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({ destination: DEST_A, asset: undefined })
+    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({ kind: 'payment', destination: DEST_A, asset: undefined })
   })
 
   it('extracts destination and asset label from a non-native payment', () => {
     const credit = new Asset('USD', ISSUER)
     const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: credit, amount: '10' })])
     expect(extractDestination(xdr, Networks.TESTNET)).toEqual({
+      kind: 'payment',
       destination: DEST_A,
       asset: `USD:${ISSUER}`,
     })
@@ -44,7 +47,7 @@ describe('extractDestination', () => {
         path: [],
       }),
     ])
-    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({ destination: DEST_A, asset: undefined })
+    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({ kind: 'payment', destination: DEST_A, asset: undefined })
   })
 
   it('returns null when operations target more than one destination', () => {
@@ -60,7 +63,7 @@ describe('extractDestination', () => {
       Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' }),
       Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '5' }),
     ])
-    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({ destination: DEST_A, asset: undefined })
+    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({ kind: 'payment', destination: DEST_A, asset: undefined })
   })
 
   it('returns null for operations with no destination (e.g. manageData)', () => {
@@ -70,5 +73,33 @@ describe('extractDestination', () => {
 
   it('returns null for malformed XDR instead of throwing', () => {
     expect(extractDestination('not-valid-xdr', Networks.TESTNET)).toBeNull()
+  })
+
+  it('extracts contract address and function from a single invokeHostFunction invokeContract', () => {
+    const xdr = buildXdr([
+      Operation.invokeContractFunction({
+        contract: CONTRACT_A,
+        function: 'transfer',
+        args: [],
+      }),
+    ])
+    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({
+      kind: 'contractInvocation',
+      destination: CONTRACT_A,
+      function: 'transfer',
+    })
+  })
+
+  it('returns null when no payment or contract destination is present', () => {
+    const xdr = buildXdr([Operation.manageData({ name: 'note', value: 'hi' })])
+    expect(extractDestination(xdr, Networks.TESTNET)).toBeNull()
+  })
+
+  it('returns null when multiple distinct contract destinations appear', () => {
+    const xdr = buildXdr([
+      Operation.invokeContractFunction({ contract: CONTRACT_A, function: 'transfer', args: [] }),
+      Operation.invokeContractFunction({ contract: CONTRACT_B, function: 'approve', args: [] }),
+    ])
+    expect(extractDestination(xdr, Networks.TESTNET)).toBeNull()
   })
 })
