@@ -17,7 +17,7 @@ describe('App', () => {
   it('renders the matching tier once the adapter resolves', async () => {
     vi.spyOn(adapter, 'getScore').mockResolvedValue(85)
     render(<App />)
-    expect(await screen.findByText('Critical risk')).toBeInTheDocument()
+    expect(await screen.findByText(/critical risk/i)).toBeInTheDocument()
     expect(screen.getByText('Score: 85')).toBeInTheDocument()
   })
 
@@ -33,15 +33,15 @@ describe('App', () => {
       .mockResolvedValueOnce(10)
     render(<App />)
     fireEvent.click(await screen.findByText('Retry'))
-    expect(await screen.findByText('Low risk')).toBeInTheDocument()
+    expect(await screen.findByText(/low risk/i)).toBeInTheDocument()
   })
 
   it('lets the dev slider override the displayed tier', async () => {
     vi.spyOn(adapter, 'getScore').mockResolvedValue(10)
     render(<App />)
-    await screen.findByText('Low risk')
+    await screen.findByText(/low risk/i)
     fireEvent.change(screen.getByLabelText(/dev: override score/i), { target: { value: '90' } })
-    expect(await screen.findByText('Critical risk')).toBeInTheDocument()
+    expect(await screen.findByText(/critical risk/i)).toBeInTheDocument()
   })
 })
 
@@ -67,7 +67,7 @@ describe('App in intercept mode', () => {
       '?mode=intercept&requestId=req-1&destination=GDEST&score=85',
     )
     render(<App />)
-    expect(screen.getByText('Critical risk')).toBeInTheDocument()
+    expect(screen.getByText(/critical risk/i)).toBeInTheDocument()
     expect(screen.getByText('GDEST')).toBeInTheDocument()
     expect(getScoreSpy).not.toHaveBeenCalled()
   })

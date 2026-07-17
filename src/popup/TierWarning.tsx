@@ -20,7 +20,13 @@ export default function TierWarning({
 }: TierWarningProps) {
   return (
     <div className="popup" style={{ borderTop: `4px solid ${tier.colour}` }}>
-      <h1>{tier.label} risk</h1>
+      {/* Icon paired with label so tier is never conveyed by colour alone (WCAG 1.4.1) */}
+      <h1>
+        <span className="tier-icon" aria-hidden="true">
+          {tier.icon}
+        </span>{' '}
+        {tier.label} risk
+      </h1>
       {destination && <p className="destination">{destination}</p>}
       <p className="score">Score: {score}</p>
       <p className="message">{tier.message}</p>
