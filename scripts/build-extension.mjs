@@ -14,6 +14,7 @@ await Promise.all(
       bundle: true,
       format: 'iife',
       target: 'chrome111',
+      sourcemap: true,
       logLevel: 'info',
     }),
   ),
