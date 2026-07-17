@@ -63,10 +63,11 @@ function hostFunctionContractAddress(op: Record<string, unknown>): string | unde
 export function extractDestination(
   xdr: string,
   networkPassphrase: string = Networks.TESTNET,
+  parseTx: typeof TransactionBuilder.fromXDR = TransactionBuilder.fromXDR.bind(TransactionBuilder),
 ): DecodedDestination | null {
   let parsed
   try {
-    parsed = TransactionBuilder.fromXDR(xdr, networkPassphrase)
+    parsed = parseTx(xdr, networkPassphrase)
   } catch {
     return null
   }

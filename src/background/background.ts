@@ -14,7 +14,7 @@ const pendingDecisions = new Map<string, (decision: Decision) => void>()
 
 function requestDecision(
   requestId: string,
-  info: { destination: string; asset?: string; score: number },
+  info: { destination: string; kind: 'payment' | 'contractInvocation'; asset?: string; function?: string; score: number },
 ): Promise<Decision> {
   return new Promise((resolve) => {
     pendingDecisions.set(requestId, resolve)
@@ -24,8 +24,10 @@ function requestDecision(
       requestId,
       destination: info.destination,
       score: String(info.score),
+      kind: info.kind,
     })
     if (info.asset) params.set('asset', info.asset)
+    if (info.function) params.set('function', info.function)
 
     chrome.windows.create({
       url: chrome.runtime.getURL(`src/popup/index.html?${params.toString()}`),

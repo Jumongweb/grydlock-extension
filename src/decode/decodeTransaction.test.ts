@@ -1,11 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { Account, Asset, Keypair, Networks, Operation, TransactionBuilder, StrKey } from '@stellar/stellar-sdk'
+import { Account, Asset, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk'
 import { extractDestination } from './decodeTransaction'
 
 const SOURCE = Keypair.random().publicKey()
-const CONTRACT_A = StrKey.encodeContract(Buffer.alloc(32, 0xab))
-const CONTRACT_B = StrKey.encodeContract(Buffer.alloc(32, 0xcd))
 const DEST_A = Keypair.random().publicKey()
 const DEST_B = Keypair.random().publicKey()
 const ISSUER = Keypair.random().publicKey()
@@ -76,30 +74,105 @@ describe('extractDestination', () => {
   })
 
   it('extracts contract address and function from a single invokeHostFunction invokeContract', () => {
-    const xdr = buildXdr([
-      Operation.invokeContractFunction({
-        contract: CONTRACT_A,
-        function: 'transfer',
-        args: [],
-      }),
-    ])
-    expect(extractDestination(xdr, Networks.TESTNET)).toEqual({
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: {
+                  contractAddress: DEST_A,
+                  functionName: 'transfer',
+                  args: [],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(
+      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+    ).toEqual({
       kind: 'contractInvocation',
-      destination: CONTRACT_A,
+      destination: DEST_A,
       function: 'transfer',
     })
   })
 
   it('returns null when no payment or contract destination is present', () => {
-    const xdr = buildXdr([Operation.manageData({ name: 'note', value: 'hi' })])
-    expect(extractDestination(xdr, Networks.TESTNET)).toBeNull()
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              { type: 'uploadContractWasm', uploadContractWasm: { wasm: Buffer.from('abc') } },
+            ],
+          },
+        },
+      ],
+    }
+    expect(
+      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+    ).toBeNull()
+  })
+
+  it('returns null when invokeContract lacks contractAddress', () => {
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: {
+                  functionName: 'transfer',
+                  args: [],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(
+      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+    ).toBeNull()
   })
 
   it('returns null when multiple distinct contract destinations appear', () => {
-    const xdr = buildXdr([
-      Operation.invokeContractFunction({ contract: CONTRACT_A, function: 'transfer', args: [] }),
-      Operation.invokeContractFunction({ contract: CONTRACT_B, function: 'approve', args: [] }),
-    ])
-    expect(extractDestination(xdr, Networks.TESTNET)).toBeNull()
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: { contractAddress: DEST_A, functionName: 'transfer', args: [] },
+              },
+            ],
+          },
+        },
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: { contractAddress: DEST_B, functionName: 'approve', args: [] },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(
+      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+    ).toBeNull()
   })
 })
