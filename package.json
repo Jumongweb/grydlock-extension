@@ -9,6 +9,8 @@
     "build": "tsc -b && vite build && node scripts/build-extension.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:visual": "playwright test",
+    "visual:serve": "vite --host 127.0.0.1 --port 4173",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/chrome": "^0.2.2",

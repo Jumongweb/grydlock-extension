@@ -147,7 +147,8 @@ src/background/background.ts      (service worker)
   the decode/scoring/decision logic directly; `src/adapter/oracleAdapter.test.ts` and
   `src/lib/tiers.test.ts` cover the adapter stub and tier mapping; `src/popup/App.test.tsx` covers
   both the popup's default (loading/error/retry/dev-slider) and intercept-mode rendering, against a
-  mocked adapter and a stubbed `chrome.runtime`.
+  mocked adapter and a stubbed `chrome.runtime`; `tests/visual/popup.spec.ts` adds screenshot
+  regression coverage for loading, error, all four tiers, and the dev slider preview.
 
 ## Develop
 
@@ -169,6 +170,9 @@ npm run build      # tsc -b && vite build && node scripts/build-extension.mjs
 ```
 
 All four run in CI (`.github/workflows/ci.yml`) on every push to `main` and on every pull request.
+Popup visual regression snapshots run in CI as well via `npm run test:visual`; if a UI change is
+intentional, refresh baselines locally with `npx playwright test --update-snapshots` and commit the
+updated files from `tests/visual/popup.spec.ts-snapshots/`.
 
 ## Roadmap
 
