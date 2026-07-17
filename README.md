@@ -109,6 +109,7 @@ src/background/background.ts      (service worker)
         │
         ├─▶ src/decode/decodeTransaction.ts → extractDestination(xdr)
         │      no single destination? → outcome 'allow', nothing shown, request passes through
+        │      soroban invokeHostFunction without a contract destination? → outcome 'allow'
         │
         ├─▶ src/adapter/oracleAdapter.ts → getScore(destination)
         │
@@ -143,11 +144,13 @@ src/background/background.ts      (service worker)
 - **Graceful degradation**: transactions with no single determinable destination (malformed XDR, no
   destination-bearing operation, or multiple distinct destinations) resolve to `'allow'` — Gryd Lock
   never blocks what it can't assess.
-- **Tests**: `src/decode/decodeTransaction.test.ts` and `src/intercept/resolveOutcome.test.ts` cover
-  the decode/scoring/decision logic directly; `src/adapter/oracleAdapter.test.ts` and
-  `src/lib/tiers.test.ts` cover the adapter stub and tier mapping; `src/popup/App.test.tsx` covers
-  both the popup's default (loading/error/retry/dev-slider) and intercept-mode rendering, against a
-  mocked adapter and a stubbed `chrome.runtime`.
+- **Soroban contract invocations**: `invokeHostFunction` operations now surface the invoked contract
+  address, plus the function name when available, as `contractInvocation` destinations. The popup
+  renders this with a distinct `Contract Invocation: <function>() @ <address>` label instead of the
+  payment-style destination format.
+- **Tests**: `src/decode/decodeTransaction.test.ts` covers both the existing payment operations and
+  Soroban `invokeHostFunction` contract invocations; `src/intercept/resolveOutcome.test.ts` adds
+  union-type decision coverage.
 
 ## Develop
 

@@ -22,6 +22,8 @@ function InterceptView({ params }: { params: URLSearchParams }) {
   const requestId = params.get('requestId') ?? ''
   const destination = params.get('destination') ?? ''
   const asset = params.get('asset') ?? undefined
+  const functionName = params.get('function') ?? undefined
+  const kind = params.get('kind') as 'payment' | 'contractInvocation' | null
   const score = Number(params.get('score') ?? '0')
   const tier = tierForScore(score)
 
@@ -31,11 +33,20 @@ function InterceptView({ params }: { params: URLSearchParams }) {
     window.close()
   }
 
+  const displayDestination =
+    kind === 'contractInvocation'
+      ? functionName
+        ? `Contract Invocation: ${functionName}() @ ${destination}`
+        : `Contract Invocation @ ${destination}`
+      : asset
+        ? `${destination} (${asset})`
+        : destination
+
   return (
     <TierWarning
       tier={tier}
       score={score}
-      destination={asset ? `${destination} (${asset})` : destination}
+      destination={displayDestination}
       onCancel={() => respond('cancel')}
       onProceed={() => respond('proceed')}
     />

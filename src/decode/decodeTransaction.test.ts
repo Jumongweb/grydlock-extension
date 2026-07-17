@@ -1,12 +1,11 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { Account, Asset, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk'
-import { extractDestination } from './decodeTransaction'
+import { Account, Asset, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk'
+import { extractDestination, extractDecodedDestination } from './decodeTransaction'
 
-const SOURCE = Keypair.random().publicKey()
-const DEST_A = Keypair.random().publicKey()
-const DEST_B = Keypair.random().publicKey()
-const ISSUER = Keypair.random().publicKey()
+const SOURCE = 'GAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQDZ7H'
+const DEST_A = 'GABAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEJXA'
+const DEST_B = 'GABQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQHGPC'
+const ISSUER = 'GACAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAJJHP'
 
 function buildXdr(operations: ReturnType<typeof Operation.payment>[]) {
   const account = new Account(SOURCE, '0')
@@ -72,9 +71,10 @@ describe('extractDestination', () => {
   it('returns null for malformed XDR instead of throwing', () => {
     expect(extractDestination('not-valid-xdr', Networks.TESTNET)).toBeNull()
   })
+})
 
+describe('extractDecodedDestination', () => {
   it('extracts contract address and function from invokeContract operations', () => {
-    // These shapes reflect the parsed SDK operation objects, not constructor helpers.
     const fakeTx = {
       operations: [
         {
@@ -86,17 +86,15 @@ describe('extractDestination', () => {
                 invokeContract: {
                   contractAddress: DEST_A,
                   functionName: 'transfer',
-                  args: [] as any[],
+                  args: [] as never[],
                 },
-              } as any,
+              },
             ],
-          } as any,
-        } as any,
+          },
+        },
       ],
     }
-    expect(
-      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
-    ).toEqual({
+    expect(extractDecodedDestination(fakeTx)).toEqual({
       kind: 'contractInvocation',
       destination: DEST_A,
       function: 'transfer',
@@ -110,15 +108,13 @@ describe('extractDestination', () => {
           type: 'invokeHostFunction',
           hostFunction: {
             functions: [
-              { type: 'uploadContractWasm', uploadContractWasm: { wasm: 'abc-wasm' } } as any,
+              { type: 'uploadContractWasm', uploadContractWasm: { wasm: 'abc-wasm' } },
             ],
-          } as any,
-        } as any,
+          },
+        },
       ],
     }
-    expect(
-      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
-    ).toBeNull()
+    expect(extractDecodedDestination(fakeTx)).toBeNull()
   })
 
   it('returns null when invokeContract provides no contractAddress', () => {
@@ -132,17 +128,15 @@ describe('extractDestination', () => {
                 type: 'invokeContract',
                 invokeContract: {
                   functionName: 'transfer',
-                  args: [] as any[],
-                } as any,
-              } as any,
+                  args: [] as never[],
+                },
+              },
             ],
-          } as any,
-        } as any,
+          },
+        },
       ],
     }
-    expect(
-      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
-    ).toBeNull()
+    expect(extractDecodedDestination(fakeTx)).toBeNull()
   })
 
   it('returns null when multiple distinct contract destinations appear', () => {
@@ -154,34 +148,24 @@ describe('extractDestination', () => {
             functions: [
               {
                 type: 'invokeContract',
-                invokeContract: {
-                  contractAddress: DEST_A,
-                  functionName: 'transfer',
-                  args: [] as any[],
-                } as any,
-              } as any,
+                invokeContract: { contractAddress: DEST_A, functionName: 'transfer', args: [] as never[] },
+              },
             ],
-          } as any,
-        } as any,
+          },
+        },
         {
           type: 'invokeHostFunction',
           hostFunction: {
             functions: [
               {
                 type: 'invokeContract',
-                invokeContract: {
-                  contractAddress: DEST_B,
-                  functionName: 'approve',
-                  args: [] as any[],
-                } as any,
-              } as any,
+                invokeContract: { contractAddress: DEST_B, functionName: 'approve', args: [] as never[] },
+              },
             ],
-          } as any,
-        } as any,
+          },
+        },
       ],
     }
-    expect(
-      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
-    ).toBeNull()
+    expect(extractDecodedDestination(fakeTx)).toBeNull()
   })
 })

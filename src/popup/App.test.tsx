@@ -105,4 +105,24 @@ describe('App in intercept mode', () => {
     })
     expect(closeSpy).toHaveBeenCalled()
   })
+
+  it('renders contract invocation label when kind is contractInvocation', () => {
+    window.history.pushState(
+      null,
+      '',
+      '?mode=intercept&requestId=req-1&destination=CCONTRACT123&score=10&kind=contractInvocation&function=approve',
+    )
+    render(<App />)
+    expect(screen.getByText(/Contract Invocation: approve\(\) @ CCONTRACT123/i)).toBeInTheDocument()
+  })
+
+  it('renders contract invocation label without function when function is missing', () => {
+    window.history.pushState(
+      null,
+      '',
+      '?mode=intercept&requestId=req-1&destination=CCONTRACT123&score=10&kind=contractInvocation',
+    )
+    render(<App />)
+    expect(screen.getByText(/Contract Invocation @ CCONTRACT123/i)).toBeInTheDocument()
+  })
 })
