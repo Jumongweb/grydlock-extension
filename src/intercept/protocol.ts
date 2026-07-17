@@ -21,3 +21,11 @@ export interface RuntimeDecisionMadeMessage {
   requestId: string
   decision: Decision
 }
+
+export interface RuntimeSignRequestInfo {
+  destination: string
+  kind: 'payment' | 'contractInvocation'
+  asset?: string
+  function?: string
+  score: number
+}

@@ -1,6 +1,7 @@
 import { extractDestination } from '../decode/decodeTransaction'
 import { getScore } from '../adapter/oracleAdapter'
 import { resolveOutcome } from '../intercept/resolveOutcome'
+import type { RuntimeSignRequestInfo } from '../intercept/protocol'
 import type {
   Decision,
   RuntimeDecisionMadeMessage,
@@ -14,7 +15,7 @@ const pendingDecisions = new Map<string, (decision: Decision) => void>()
 
 function requestDecision(
   requestId: string,
-  info: { destination: string; kind: 'payment' | 'contractInvocation'; asset?: string; function?: string; score: number },
+  info: RuntimeSignRequestInfo,
 ): Promise<Decision> {
   return new Promise((resolve) => {
     pendingDecisions.set(requestId, resolve)

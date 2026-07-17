@@ -1,17 +1,10 @@
-import type { Decision, Outcome } from './protocol'
-
+import type { Decision, Outcome, RuntimeSignRequestInfo } from './protocol'
 import type { DecodedDestination } from '../decode/decodeTransaction'
 
 export interface ResolveOutcomeDeps {
   extractDestination: (xdr: string) => DecodedDestination | null
   getScore: (destination: string) => Promise<number>
-  requestDecision: (info: {
-    destination: string
-    kind: DecodedDestination['kind']
-    asset?: string
-    function?: string
-    score: number
-  }) => Promise<Decision>
+  requestDecision: (info: RuntimeSignRequestInfo) => Promise<Decision>
 }
 
 /**

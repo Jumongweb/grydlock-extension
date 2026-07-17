@@ -73,7 +73,8 @@ describe('extractDestination', () => {
     expect(extractDestination('not-valid-xdr', Networks.TESTNET)).toBeNull()
   })
 
-  it('extracts contract address and function from a single invokeHostFunction invokeContract', () => {
+  it('extracts contract address and function from invokeContract operations', () => {
+    // These shapes reflect the parsed SDK operation objects, not constructor helpers.
     const fakeTx = {
       operations: [
         {
@@ -85,16 +86,16 @@ describe('extractDestination', () => {
                 invokeContract: {
                   contractAddress: DEST_A,
                   functionName: 'transfer',
-                  args: [],
+                  args: [] as any[],
                 },
-              },
+              } as any,
             ],
-          },
-        },
+          } as any,
+        } as any,
       ],
     }
     expect(
-      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
     ).toEqual({
       kind: 'contractInvocation',
       destination: DEST_A,
@@ -102,25 +103,25 @@ describe('extractDestination', () => {
     })
   })
 
-  it('returns null when no payment or contract destination is present', () => {
+  it('returns null when invokeHostFunction has no invokeContract function', () => {
     const fakeTx = {
       operations: [
         {
           type: 'invokeHostFunction',
           hostFunction: {
             functions: [
-              { type: 'uploadContractWasm', uploadContractWasm: { wasm: Buffer.from('abc') } },
+              { type: 'uploadContractWasm', uploadContractWasm: { wasm: 'abc-wasm' } } as any,
             ],
-          },
-        },
+          } as any,
+        } as any,
       ],
     }
     expect(
-      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
     ).toBeNull()
   })
 
-  it('returns null when invokeContract lacks contractAddress', () => {
+  it('returns null when invokeContract provides no contractAddress', () => {
     const fakeTx = {
       operations: [
         {
@@ -131,16 +132,16 @@ describe('extractDestination', () => {
                 type: 'invokeContract',
                 invokeContract: {
                   functionName: 'transfer',
-                  args: [],
-                },
-              },
+                  args: [] as any[],
+                } as any,
+              } as any,
             ],
-          },
-        },
+          } as any,
+        } as any,
       ],
     }
     expect(
-      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
     ).toBeNull()
   })
 
@@ -153,26 +154,34 @@ describe('extractDestination', () => {
             functions: [
               {
                 type: 'invokeContract',
-                invokeContract: { contractAddress: DEST_A, functionName: 'transfer', args: [] },
-              },
+                invokeContract: {
+                  contractAddress: DEST_A,
+                  functionName: 'transfer',
+                  args: [] as any[],
+                } as any,
+              } as any,
             ],
-          },
-        },
+          } as any,
+        } as any,
         {
           type: 'invokeHostFunction',
           hostFunction: {
             functions: [
               {
                 type: 'invokeContract',
-                invokeContract: { contractAddress: DEST_B, functionName: 'approve', args: [] },
-              },
+                invokeContract: {
+                  contractAddress: DEST_B,
+                  functionName: 'approve',
+                  args: [] as any[],
+                } as any,
+              } as any,
             ],
-          },
-        },
+          } as any,
+        } as any,
       ],
     }
     expect(
-      extractDestination('_ignored_xdr_', Networks.TESTNET, () => fakeTx),
+      extractDestination('ignored-xdr', Networks.TESTNET, () => fakeTx),
     ).toBeNull()
   })
 })
