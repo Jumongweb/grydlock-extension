@@ -162,6 +162,7 @@ src/background/background.ts      (service worker)
 ## Quality Gates
 
 ```bash
+npm run check:versions  # package.json and manifest.json stay in lockstep
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
 npm test           # Vitest
@@ -169,6 +170,16 @@ npm run build      # tsc -b && vite build && node scripts/build-extension.mjs
 ```
 
 All four run in CI (`.github/workflows/ci.yml`) on every push to `main` and on every pull request.
+
+## Releases
+
+- Version numbers live in both `package.json` and `manifest.json`; `npm run check:versions` fails if
+  they drift, and CI runs that check before the rest of the quality gates.
+- `.github/workflows/release.yml` publishes releases from version tags such as `v0.1.0`, or from a
+  manual workflow dispatch with a `tag_name` input.
+- The release workflow reruns the full verification suite, builds the extension, zips `dist/` into
+  `release/grydlock-extension-v<version>.zip`, and creates a GitHub Release with generated notes and
+  the zip attached for Chrome Web Store upload.
 
 ## Roadmap
 
