@@ -1,60 +1,56 @@
 import { Asset, FeeBumpTransaction, Networks, TransactionBuilder } from '@stellar/stellar-sdk'
+import type { OperationRecord } from '@stellar/stellar-sdk'
 
 export type DecodedDestination =
   | { kind: 'payment'; destination: string; asset?: string }
   | { kind: 'contractInvocation'; destination: string; function?: string }
 
-const DESTINATION_OPERATION_TYPES = new Set([
-  'payment',
-  'pathPaymentStrictSend',
-  'pathPaymentStrictReceive',
-  'createAccount',
-])
+interface OperationDestinations {
+  destinations: string[]
+  asset?: string
+}
 
-function assetLabel(op: Record<string, unknown>): string | undefined {
-  const asset = (op.asset ?? op.destAsset) as Asset | undefined
+function assetLabel(asset: Asset | undefined): string | undefined {
   if (!asset || asset.isNative()) return undefined
   return `${asset.getCode()}:${asset.getIssuer()}`
 }
 
-function hostFunctionFunctionName(hostFunction: unknown): string | undefined {
-  if (!hostFunction || typeof hostFunction !== 'object') return undefined
-  const functions = (hostFunction as Record<string, unknown>).functions as
-    | Array<{ type: string; invokeContract?: { functionName?: string } }>
-    | undefined
-  if (!functions || !Array.isArray(functions)) return undefined
-  const fn = functions.find((f) => f.type === 'invokeContract')
-  if (!fn) return undefined
-  return typeof fn.invokeContract?.functionName === 'string'
-    ? fn.invokeContract.functionName
-    : undefined
-}
-
-function isInvokeContractHostFunction(op: Record<string, unknown>): boolean {
-  const hostFunction = op.hostFunction as unknown
-  if (!hostFunction || typeof hostFunction !== 'object') return false
-  const functions = (hostFunction as Record<string, unknown>).functions as
-    | { type: string }[]
-    | undefined
-  if (!functions || !Array.isArray(functions)) return false
-  return functions.some((f) => f.type === 'invokeContract')
-}
-
-function hostFunctionContractAddress(op: Record<string, unknown>): string | undefined {
-  const hostFunction = op.hostFunction as unknown
-  if (!hostFunction || typeof hostFunction !== 'object') return undefined
-  const functions = (hostFunction as Record<string, unknown>).functions as
-    | { type: string; invokeContract?: { contractAddress?: string } }[]
-    | undefined
-  if (!functions || !Array.isArray(functions)) return undefined
-  const fn = functions.find((f) => f.type === 'invokeContract')
-  if (!fn) return undefined
-  if (typeof fn.invokeContract?.contractAddress === 'string') {
-    return fn.invokeContract.contractAddress
+/**
+ * Maps a single operation to the destination(s) it pays or transfers value
+ * to. createClaimableBalance yields one candidate destination per claimant,
+ * since any of them may go on to claim the balance. claimClaimableBalance
+ * carries no destination account in the operation itself — only an opaque
+ * balance ID — so the ID is used as the scoreable identifier instead.
+ */
+function destinationsFor(op: OperationRecord): OperationDestinations {
+  switch (op.type) {
+    case 'payment':
+      return { destinations: [op.destination], asset: assetLabel(op.asset) }
+    case 'pathPaymentStrictSend':
+    case 'pathPaymentStrictReceive':
+      return { destinations: [op.destination], asset: assetLabel(op.destAsset) }
+    case 'createAccount':
+      return { destinations: [op.destination] }
+    case 'createClaimableBalance':
+      return {
+        destinations: op.claimants.map((claimant) => claimant.destination),
+        asset: assetLabel(op.asset),
+      }
+    case 'claimClaimableBalance':
+      return { destinations: [op.balanceId] }
+    default:
+      return { destinations: [] }
   }
-  return undefined
 }
 
+/**
+ * Extracts the single destination an unsigned transaction pays or transfers
+ * value to. Returns null (never throws) when the XDR is malformed, the
+ * transaction has no destination-bearing operation, or it resolves to more
+ * than one distinct destination — e.g. a batch of payments to different
+ * accounts, or a createClaimableBalance with multiple claimants. Callers
+ * should treat null as "can't determine a single destination to score."
+ */
 export function extractDestination(
   xdr: string,
   networkPassphrase: string = Networks.TESTNET,
@@ -80,23 +76,11 @@ export function extractDecodedDestination(
   let asset: string | undefined
   let functionName: string | undefined
 
-  for (const op of operations) {
-    const rawOp = op as Record<string, unknown>
-    const opType = typeof rawOp.type === 'string' ? rawOp.type : ''
-    if (DESTINATION_OPERATION_TYPES.has(opType) && 'destination' in rawOp && rawOp.destination) {
-      destinations.add(typeof rawOp.destination === 'string' ? rawOp.destination : ('' as never))
-      kinds.add('payment')
-      asset = assetLabel(rawOp)
-    } else if (opType === 'invokeHostFunction') {
-      if (isInvokeContractHostFunction(rawOp)) {
-        const address = hostFunctionContractAddress(rawOp)
-        if (address) {
-          destinations.add(address)
-          kinds.add('contractInvocation')
-          functionName = hostFunctionFunctionName(rawOp.hostFunction as unknown)
-        }
-      }
-    }
+  for (const op of tx.operations) {
+    const resolved = destinationsFor(op)
+    if (resolved.destinations.length === 0) continue
+    for (const destination of resolved.destinations) destinations.add(destination)
+    asset = resolved.asset
   }
 
   if (destinations.size !== 1 || kinds.size !== 1) {
