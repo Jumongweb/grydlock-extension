@@ -1,6 +1,8 @@
 import { extractDestination } from '../decode/decodeTransaction'
 import { getScore } from '../adapter/oracleAdapter'
 import { resolveOutcome } from '../intercept/resolveOutcome'
+import { recordDecision } from '../lib/history'
+import { tierForScore } from '../lib/tiers'
 import type {
   Decision,
   RuntimeDecisionMadeMessage,
@@ -10,35 +12,34 @@ import type {
 
 type IncomingMessage = RuntimeSignRequestMessage | RuntimeDecisionMadeMessage
 
-export const pendingDecisions = new Map<string, (decision: Decision) => void>()
-export const MAX_REQUESTS_PER_MINUTE = 5
+const pendingDecisions = new Map<string, (decision: Decision) => void>()
 
-// Map of queueKey -> array of request timestamps (within the last 60 seconds)
-export const requestTimestamps = new Map<string, number[]>()
+function requestDecision(
+  requestId: string,
+  info: { destination: string; asset?: string; score: number },
+): Promise<Decision> {
+  return new Promise((resolve) => {
+    pendingDecisions.set(requestId, (decision) => {
+      // History stays on-device (chrome.storage.local); a write failure must
+      // never block the signing flow, so record fire-and-forget.
+      void recordDecision({
+        destination: info.destination,
+        asset: info.asset,
+        score: info.score,
+        tier: tierForScore(info.score).tier,
+        decision,
+        timestamp: Date.now(),
+      }).catch(() => {})
+      resolve(decision)
+    })
 
-interface QueuedRequest {
-  requestId: string
-  info: { destination: string; asset?: string; score: number }
-  resolve: (decision: Decision) => void
-}
-
-// Map of queueKey -> array of queued requests
-export const queues = new Map<string, QueuedRequest[]>()
-
-// Map of queueKey -> active window and requestId information
-export const activeWindows = new Map<string, { windowId?: number; requestId: string }>()
-
-export function checkRateLimit(queueKey: string): boolean {
-  const now = Date.now()
-  let timestamps = requestTimestamps.get(queueKey) || []
-  timestamps = timestamps.filter((t) => now - t < 60000)
-  if (timestamps.length >= MAX_REQUESTS_PER_MINUTE) {
-    return false
-  }
-  timestamps.push(now)
-  requestTimestamps.set(queueKey, timestamps)
-  return true
-}
+    const params = new URLSearchParams({
+      mode: 'intercept',
+      requestId,
+      destination: info.destination,
+      score: String(info.score),
+    })
+    if (info.asset) params.set('asset', info.asset)
 
 export function getQueueKey(sender: chrome.runtime.MessageSender): string {
   const tabId = sender.tab?.id
