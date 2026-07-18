@@ -10,6 +10,21 @@ interface TierWarningProps {
   devControl?: ReactNode
 }
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+function focusableWithin(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) => !el.hasAttribute('hidden') && el.getAttribute('aria-hidden') !== 'true',
+  )
+}
+
 export default function TierWarning({
   tier,
   score,
@@ -48,7 +63,7 @@ export default function TierWarning({
       <p id="tier-warning-score" className="score">Score: {score}</p>
       <p id="tier-warning-message" className="message">{tier.message}</p>
       <div className="actions">
-        <button className="cancel" onClick={onCancel}>
+        <button className="cancel" onClick={onCancel} ref={cancelRef}>
           Cancel
         </button>
         <button className="proceed" onClick={onProceed}>
