@@ -179,3 +179,24 @@ All four run in CI (`.github/workflows/ci.yml`) on every push to `main` and on e
 - [ ] Generalise interception beyond Freighter.
 
 > **Do not build real interception until the adapter returns a real score.** Interception without a working score source is a warning with nothing to warn about.
+
+## Dependency Maintenance
+
+Dependabot checks npm dependencies and GitHub Actions every Monday. Updates are grouped so routine
+tooling changes do not obscure runtime changes that affect the wallet-warning path.
+
+Dependabot alerts and security updates are controlled in repository settings and should remain
+enabled. This file configures the scheduled version-update pull requests.
+
+The auto-merge policy is intentionally narrow:
+
+- patch updates to direct development dependencies may auto-merge;
+- patch updates to GitHub Actions may auto-merge;
+- runtime dependencies, indirect dependencies, and every minor or major update require human review;
+- a Dependabot PR with maintainer-authored changes is no longer auto-merge eligible.
+
+Auto-merge does not replace CI. The repository must enable GitHub auto-merge, protect `main`, and
+require the existing CI `verify` job. Repository or organization Actions settings must also allow
+the workflow token to approve pull requests. If those settings are absent, maintainers should merge
+Dependabot PRs manually after `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`
+pass.
