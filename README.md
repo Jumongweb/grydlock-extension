@@ -143,6 +143,13 @@ src/background/background.ts      (service worker)
 - **Graceful degradation**: transactions with no single determinable destination (malformed XDR, no
   destination-bearing operation, or multiple distinct destinations) resolve to `'allow'` — Gryd Lock
   never blocks what it can't assess.
+- **Destination-bearing operations**: `payment`, `pathPaymentStrictSend`/`pathPaymentStrictReceive`,
+  `createAccount`, `createClaimableBalance`, and `claimClaimableBalance`. A `createClaimableBalance`
+  contributes one candidate destination per claimant, since any of them may later claim it; a
+  transaction with more than one claimant is a multiple-distinct-destination case and resolves to
+  `'allow'` like any other batch, pending the dedicated multi-destination scoring in #20.
+  `claimClaimableBalance` carries no destination account in the operation itself — only an opaque
+  balance ID — so the balance ID is scored in its place.
 - **Tests**: `src/decode/decodeTransaction.test.ts` and `src/intercept/resolveOutcome.test.ts` cover
   the decode/scoring/decision logic directly; `src/adapter/oracleAdapter.test.ts` and
   `src/lib/tiers.test.ts` cover the adapter stub and tier mapping; `src/popup/App.test.tsx` covers
