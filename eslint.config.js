@@ -21,6 +21,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+// CI safeguard: these restricted globals/imports enforce that no network calls are made outside src/adapter/
     },
   },
   {
