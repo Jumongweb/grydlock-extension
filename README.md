@@ -102,7 +102,9 @@ src/intercept/mainWorldEntry.ts   (MAIN world; grabs the request via stopImmedia
         │                          before Freighter's own listener sees it)
         │  window.postMessage (Gryd Lock's own internal request/response, separate from Freighter's)
         ▼
-src/intercept/bridgeEntry.ts      (isolated world; only place with chrome.* API access)
+src/intercept/bridgeEntry.ts      (isolated world; only place with chrome.* API access;
+        │                          generates the real requestId here, never in MAIN world,
+        │                          so a page script can't observe it and forge a decision)
         │  chrome.runtime.sendMessage
         ▼
 src/background/background.ts      (service worker)
@@ -113,12 +115,13 @@ src/background/background.ts      (service worker)
         ├─▶ src/adapter/oracleAdapter.ts → getScore(destination)
         │
         └─▶ chrome.windows.create(popup?mode=intercept&requestId&destination&score)
-                   │
+                   │  pendingDecisions records the created popup's windowId
                    ▼
              src/popup/App.tsx (intercept mode) renders the tier + destination + Proceed/Cancel
                    │  chrome.runtime.sendMessage({ type: 'DECISION_MADE', ... })
                    ▼
-        background resolves the pending request → bridge → mainWorld
+        background only resolves the pending request if DECISION_MADE's sender window matches
+        the popup it created for that requestId (otherwise ignored) → bridge → mainWorld
                    │
                    ▼
         'cancel'            → mainWorld synthesizes a decline FREIGHTER_EXTERNAL_MSG_RESPONSE;

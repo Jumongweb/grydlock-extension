@@ -22,20 +22,29 @@ interface FreighterSubmitTransactionRequest {
   __grydlockReviewed?: boolean
 }
 
+/**
+ * `localId` only correlates this page's own request/response postMessage
+ * pair -- it is visible to any script on the page, same as everything else
+ * that crosses this boundary. The security-relevant requestId used by
+ * background.ts's pendingDecisions is generated in bridgeEntry.ts (isolated
+ * world) instead and never appears in this postMessage traffic, so a page
+ * script observing `localId` gains nothing it can replay against the
+ * background worker.
+ */
 function requestOutcome(xdr: string): Promise<Outcome> {
-  const requestId = crypto.randomUUID()
+  const localId = crypto.randomUUID()
 
   return new Promise((resolve) => {
     function onMessage(event: MessageEvent) {
       if (event.source !== window) return
-      const data = event.data as { type?: string; requestId?: string; outcome?: string } | undefined
-      if (data?.type !== WINDOW_RESPONSE_TYPE || data.requestId !== requestId) return
+      const data = event.data as { type?: string; localId?: string; outcome?: string } | undefined
+      if (data?.type !== WINDOW_RESPONSE_TYPE || data.localId !== localId) return
       window.removeEventListener('message', onMessage)
       const outcome = data.outcome
       resolve(outcome === 'proceed' || outcome === 'allow' ? outcome : 'cancel')
     }
     window.addEventListener('message', onMessage)
-    window.postMessage({ type: WINDOW_REQUEST_TYPE, requestId, xdr }, '*')
+    window.postMessage({ type: WINDOW_REQUEST_TYPE, localId, xdr }, '*')
   })
 }
 
