@@ -10,14 +10,20 @@ import type {
 
 type IncomingMessage = RuntimeSignRequestMessage | RuntimeDecisionMadeMessage
 
-const pendingDecisions = new Map<string, (decision: Decision) => void>()
+interface PendingDecision {
+  resolve: (decision: Decision) => void
+  windowId?: number
+}
 
-function requestDecision(
+export const pendingDecisions = new Map<string, PendingDecision>()
+
+export function requestDecision(
   requestId: string,
   info: { destination: string; asset?: string; score: number },
 ): Promise<Decision> {
   return new Promise((resolve) => {
-    pendingDecisions.set(requestId, resolve)
+    const pending: PendingDecision = { resolve }
+    pendingDecisions.set(requestId, pending)
 
     const params = new URLSearchParams({
       mode: 'intercept',
@@ -27,13 +33,32 @@ function requestDecision(
     })
     if (info.asset) params.set('asset', info.asset)
 
-    chrome.windows.create({
-      url: chrome.runtime.getURL(`src/popup/index.html?${params.toString()}`),
-      type: 'popup',
-      width: 320,
-      height: 420,
-    })
+    chrome.windows
+      .create({
+        url: chrome.runtime.getURL(`src/popup/index.html?${params.toString()}`),
+        type: 'popup',
+        width: 320,
+        height: 420,
+      })
+      .then((win) => {
+        pending.windowId = win?.id
+      })
   })
+}
+
+export function handleDecisionMade(requestId: string, decision: Decision): void {
+  pendingDecisions.get(requestId)?.resolve(decision)
+  pendingDecisions.delete(requestId)
+}
+
+export function handleWindowRemoved(windowId: number): void {
+  for (const [requestId, pending] of pendingDecisions) {
+    if (pending.windowId === windowId) {
+      pending.resolve('cancel')
+      pendingDecisions.delete(requestId)
+      return
+    }
+  }
 }
 
 chrome.runtime.onMessage.addListener((message: IncomingMessage, _sender, sendResponse) => {
@@ -55,10 +80,10 @@ chrome.runtime.onMessage.addListener((message: IncomingMessage, _sender, sendRes
   }
 
   if (message.type === 'DECISION_MADE') {
-    const resolve = pendingDecisions.get(message.requestId)
-    resolve?.(message.decision)
-    pendingDecisions.delete(message.requestId)
+    handleDecisionMade(message.requestId, message.decision)
   }
 
   return undefined
 })
+
+chrome.windows.onRemoved.addListener(handleWindowRemoved)
