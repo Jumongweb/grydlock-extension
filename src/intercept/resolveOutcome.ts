@@ -1,4 +1,4 @@
-import type { Decision, Outcome } from './protocol'
+import { addTrustedAddress, getTrustedAddresses, removeTrustedAddress } from '../utils/storageHelper';
 
 export interface ResolveOutcomeDeps {
   extractDestination: (xdr: string) => { destination: string; asset?: string } | null
@@ -13,9 +13,14 @@ export interface ResolveOutcomeDeps {
  * defers to the user's proceed/cancel decision.
  */
 export async function resolveOutcome(xdr: string, deps: ResolveOutcomeDeps): Promise<Outcome> {
-  const decoded = deps.extractDestination(xdr)
-  if (!decoded) return 'allow'
-
-  const score = await deps.getScore(decoded.destination)
-  return deps.requestDecision({ destination: decoded.destination, asset: decoded.asset, score })
+  const decoded = deps.extractDestination(xdr);
+  if (!decoded) return 'allow';
+  // Check if destination is trusted
+  const trusted = await getTrustedAddresses();
+  if (trusted.includes(decoded.destination)) {
+    // Skip warning for trusted address
+    return 'allow';
+  }
+  const score = await deps.getScore(decoded.destination);
+  return deps.requestDecision({ destination: decoded.destination, asset: decoded.asset, score });
 }

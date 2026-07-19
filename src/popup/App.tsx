@@ -1,34 +1,35 @@
-import { useEffect, useState } from 'react'
-import { getScore } from '../adapter/oracleAdapter'
-import { tierForScore } from '../lib/tiers'
-import DevScoreSlider from './DevScoreSlider'
-import TierWarning from './TierWarning'
-import type { RuntimeDecisionMadeMessage } from '../intercept/protocol'
-import './App.css'
+import { useEffect, useState } from 'react';
+import { getScore } from '../adapter/oracleAdapter';
+import { tierForScore } from '../lib/tiers';
+import DevScoreSlider from './DevScoreSlider';
+import TierWarning from './TierWarning';
+import type { RuntimeDecisionMadeMessage } from '../intercept/protocol';
+import './App.css';
+import TrustedAddressesManager from './TrustedAddressesManager';
 
-const PLACEHOLDER_DESTINATION = 'GABCDEXAMPLE0000000000000000000000000000000000000000000'
+const PLACEHOLDER_DESTINATION = 'GABCDEXAMPLE0000000000000000000000000000000000000000000';
 
-type LoadState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; score: number }
+type LoadState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; score: number };
 
 export default function App() {
-  const params = new URLSearchParams(window.location.search)
+  const params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'intercept') {
-    return <InterceptView params={params} />
+    return <InterceptView params={params} />;
   }
-  return <DevPreview />
+  return <DevPreview />;
 }
 
 function InterceptView({ params }: { params: URLSearchParams }) {
-  const requestId = params.get('requestId') ?? ''
-  const destination = params.get('destination') ?? ''
-  const asset = params.get('asset') ?? undefined
-  const score = Number(params.get('score') ?? '0')
-  const tier = tierForScore(score)
+  const requestId = params.get('requestId') ?? '';
+  const destination = params.get('destination') ?? '';
+  const asset = params.get('asset') ?? undefined;
+  const score = Number(params.get('score') ?? '0');
+  const tier = tierForScore(score);
 
   function respond(decision: 'proceed' | 'cancel') {
-    const message: RuntimeDecisionMadeMessage = { type: 'DECISION_MADE', requestId, decision }
-    chrome.runtime.sendMessage(message)
-    window.close()
+    const message: RuntimeDecisionMadeMessage = { type: 'DECISION_MADE', requestId, decision };
+    chrome.runtime.sendMessage(message);
+    window.close();
   }
 
   return (
@@ -39,49 +40,61 @@ function InterceptView({ params }: { params: URLSearchParams }) {
       onCancel={() => respond('cancel')}
       onProceed={() => respond('proceed')}
     />
-  )
+  );
 }
 
 function DevPreview() {
-  const [attempt, setAttempt] = useState(0)
-  return <ScoreView key={attempt} onRetry={() => setAttempt((n) => n + 1)} />
+  const [attempt, setAttempt] = useState(0);
+  const [showManager, setShowManager] = useState(false);
+
+  return (
+    <>
+      <ScoreView key={attempt} onRetry={() => setAttempt((n) => n + 1)} />
+      <button
+        className="manage-trusted"
+        onClick={() => setShowManager(true)}
+        style={manageBtnStyle}
+      >
+        Manage Trusted Addresses
+      </button>
+      {showManager && <TrustedAddressesManager onClose={() => setShowManager(false)} />}
+    </>
+  );
 }
 
 function ScoreView({ onRetry }: { onRetry: () => void }) {
-  const [state, setState] = useState<LoadState>({ status: 'loading' })
-  const [devOverride, setDevOverride] = useState<number | null>(null)
+  const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [devOverride, setDevOverride] = useState<number | null>(null);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     getScore(PLACEHOLDER_DESTINATION)
       .then((score) => {
-        if (!cancelled) setState({ status: 'ready', score })
+        if (!cancelled) setState({ status: 'ready', score });
       })
       .catch(() => {
-        if (!cancelled) setState({ status: 'error' })
-      })
+        if (!cancelled) setState({ status: 'error' });
+      });
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
   if (state.status === 'loading') {
-    return <div className="popup">Checking destination…</div>
+    return <div className="popup">Checking destination…</div>;
   }
 
   if (state.status === 'error') {
     return (
       <div className="popup">
         <p className="message">Could not reach the risk oracle.</p>
-        <button className="proceed" onClick={onRetry}>
-          Retry
-        </button>
+        <button className="proceed" onClick={onRetry}>Retry</button>
       </div>
-    )
+    );
   }
 
-  const displayScore = devOverride ?? state.score
-  const tier = tierForScore(displayScore)
+  const displayScore = devOverride ?? state.score;
+  const tier = tierForScore(displayScore);
 
   return (
     <TierWarning
@@ -89,9 +102,17 @@ function ScoreView({ onRetry }: { onRetry: () => void }) {
       score={displayScore}
       onCancel={() => window.close()}
       onProceed={() => window.close()}
-      devControl={
-        import.meta.env.DEV && <DevScoreSlider score={displayScore} onChange={setDevOverride} />
-      }
+      devControl={import.meta.env.DEV && <DevScoreSlider score={displayScore} onChange={setDevOverride} />}
     />
-  )
+  );
 }
+
+const manageBtnStyle = {
+  marginTop: '1rem',
+  padding: '0.5rem 1rem',
+  background: '#1976d2',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+} as const;
