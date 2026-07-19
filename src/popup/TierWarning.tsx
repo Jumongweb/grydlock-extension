@@ -61,6 +61,22 @@ export default function TierWarning({
     cancelRef.current?.focus()
   }, [])
 
+  useEffect(() => {
+    function handleDocumentKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== 'Tab' || !dialogRef.current) {
+        return
+      }
+
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault()
+        cancelRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleDocumentKeyDown)
+    return () => document.removeEventListener('keydown', handleDocumentKeyDown)
+  }, [])
+
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
       onCancel()
