@@ -1,6 +1,8 @@
 import { extractDestination } from '../decode/decodeTransaction'
 import { getScore } from '../adapter/oracleAdapter'
 import { resolveOutcome } from '../intercept/resolveOutcome'
+import { recordDecision } from '../lib/history'
+import { tierForScore } from '../lib/tiers'
 import type {
   Decision,
   RuntimeDecisionMadeMessage,
@@ -17,7 +19,19 @@ function requestDecision(
   info: { destinations: { destination: string; asset?: string }[]; scores: Array<{ destination: string; asset?: string; score: number }>; worstScore: number },
 ): Promise<Decision> {
   return new Promise((resolve) => {
-    pendingDecisions.set(requestId, resolve)
+    pendingDecisions.set(requestId, (decision) => {
+      // History stays on-device (chrome.storage.local); a write failure must
+      // never block the signing flow, so record fire-and-forget.
+      void recordDecision({
+        destination: info.destination,
+        asset: info.asset,
+        score: info.score,
+        tier: tierForScore(info.score).tier,
+        decision,
+        timestamp: Date.now(),
+      }).catch(() => {})
+      resolve(decision)
+    })
 
     const params = new URLSearchParams({
       requestId,
