@@ -235,6 +235,15 @@ that unit tests cannot provide:
 
 You can configure the default timeout by modifying `src/adapter/config.ts` (`DEFAULT_GET_SCORE_TIMEOUT_MS`). Tests use a shorter timeout to verify the fallback behaviour.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, architecture guardrails, testing
+expectations, required quality gates, and the pull request checklist.
+
+Changes that introduce or alter shared abstractions, browser-context responsibilities, message
+contracts, interception semantics, or security boundaries should follow the lightweight
+[Architecture Decision Record process](docs/adr/README.md).
+
 ## Roadmap
 
 - [x] Popup renders one score across the four tiers. _(stub)_
