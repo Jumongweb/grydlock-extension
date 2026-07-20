@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getScore } from '../adapter/oracleAdapter'
-import { tierForScore } from '../lib/tiers'
+import { tierForScore, UNSCORED_TIER_INFO } from '../lib/tiers'
 import DevScoreSlider from './DevScoreSlider'
 import TierWarning from './TierWarning'
 import type { RuntimeDecisionMadeMessage } from '../intercept/protocol'

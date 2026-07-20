@@ -165,6 +165,24 @@ chrome.runtime.onMessage.addListener((message: IncomingMessage, sender, sendResp
       }
       sendResponse(response)
     })
+      .then((outcome) => {
+        const response: RuntimeSignOutcomeMessage = {
+          type: 'SIGN_OUTCOME',
+          requestId: message.requestId,
+          outcome,
+        }
+        sendResponse(response)
+      })
+      .catch(() => {
+        // Last-resort safety net: if resolveOutcome rejects for any unexpected
+        // reason, cancel the transaction rather than leaving the bridge hanging.
+        const response: RuntimeSignOutcomeMessage = {
+          type: 'SIGN_OUTCOME',
+          requestId: message.requestId,
+          outcome: 'cancel',
+        }
+        sendResponse(response)
+      })
 
       return true
     }
