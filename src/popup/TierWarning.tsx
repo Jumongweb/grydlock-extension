@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { TierInfo } from '../lib/tiers'
 
@@ -33,18 +34,71 @@ export default function TierWarning({
   onProceed,
   devControl,
 }: TierWarningProps) {
+  const popupRef = useRef<HTMLDivElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+
   // We construct a list of IDs to wire up the describedby relationship,
   // omitting the destination if it's not present.
   const describedByIds = [
     destination ? 'tier-warning-destination' : null,
     'tier-warning-score',
-    'tier-warning-message'
-  ].filter(Boolean).join(' ')
+    'tier-warning-message',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  useEffect(() => {
+    cancelRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const popup = popupRef.current
+      if (!popup) return
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const focusable = focusableWithin(popup)
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const activeElement = document.activeElement
+
+      if (!popup.contains(activeElement)) {
+        event.preventDefault()
+        first.focus()
+        return
+      }
+
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
 
   return (
     <div
+      ref={popupRef}
       className="popup"
       data-tier={tier.tier}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tier-warning-title"
+      aria-describedby={describedByIds}
       style={
         {
           '--tier-accent-light': tier.colour,
