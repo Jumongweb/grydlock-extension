@@ -22,17 +22,8 @@ interface FreighterSubmitTransactionRequest {
   __grydlockReviewed?: boolean
 }
 
-/**
- * `localId` only correlates this page's own request/response postMessage
- * pair -- it is visible to any script on the page, same as everything else
- * that crosses this boundary. The security-relevant requestId used by
- * background.ts's pendingDecisions is generated in bridgeEntry.ts (isolated
- * world) instead and never appears in this postMessage traffic, so a page
- * script observing `localId` gains nothing it can replay against the
- * background worker.
- */
-function requestOutcome(xdr: string): Promise<Outcome> {
-  const localId = crypto.randomUUID()
+function requestOutcome(xdr: string, networkPassphrase?: string): Promise<Outcome> {
+  const requestId = crypto.randomUUID()
 
   return new Promise((resolve) => {
     function onMessage(event: MessageEvent) {
@@ -44,7 +35,7 @@ function requestOutcome(xdr: string): Promise<Outcome> {
       resolve(outcome === 'proceed' || outcome === 'allow' ? outcome : 'cancel')
     }
     window.addEventListener('message', onMessage)
-    window.postMessage({ type: WINDOW_REQUEST_TYPE, localId, xdr }, '*')
+    window.postMessage({ type: WINDOW_REQUEST_TYPE, requestId, xdr, networkPassphrase }, '*')
   })
 }
 
@@ -75,8 +66,9 @@ window.addEventListener(
 
     event.stopImmediatePropagation()
     const request = data as FreighterSubmitTransactionRequest
+    const networkPassphrase = request.networkPassphrase ?? request.network
 
-    requestOutcome(request.transactionXdr).then((outcome) => {
+    requestOutcome(request.transactionXdr, networkPassphrase).then((outcome) => {
       if (outcome === 'cancel') {
         window.postMessage(
           {

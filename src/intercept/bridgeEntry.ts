@@ -7,19 +7,16 @@ import {
 
 window.addEventListener('message', (event) => {
   if (event.source !== window) return
-  const data = event.data as { type?: string; localId?: string; xdr?: string } | undefined
-  if (data?.type !== WINDOW_REQUEST_TYPE || !data.localId || !data.xdr) return
-
-  const localId = data.localId
-  // Generated here, in the isolated world, so it's never exposed to the
-  // page's own JS context via postMessage -- only this requestId is ever
-  // used to key background.ts's pendingDecisions map.
-  const requestId = crypto.randomUUID()
+  const data = event.data as
+    | { type?: string; requestId?: string; xdr?: string; networkPassphrase?: string }
+    | undefined
+  if (data?.type !== WINDOW_REQUEST_TYPE || !data.requestId || !data.xdr) return
 
   const message: RuntimeSignRequestMessage = {
     type: 'SIGN_REQUEST',
     requestId,
     xdr: data.xdr,
+    networkPassphrase: data.networkPassphrase,
   }
 
   chrome.runtime.sendMessage(message, (response: RuntimeSignOutcomeMessage | undefined) => {
