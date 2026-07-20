@@ -28,8 +28,8 @@ function requestOutcome(xdr: string, networkPassphrase?: string): Promise<Outcom
   return new Promise((resolve) => {
     function onMessage(event: MessageEvent) {
       if (event.source !== window) return
-      const data = event.data as { type?: string; requestId?: string; outcome?: string } | undefined
-      if (data?.type !== WINDOW_RESPONSE_TYPE || data.requestId !== requestId) return
+      const data = event.data as { type?: string; localId?: string; outcome?: string } | undefined
+      if (data?.type !== WINDOW_RESPONSE_TYPE || data.localId !== localId) return
       window.removeEventListener('message', onMessage)
       const outcome = data.outcome
       resolve(outcome === 'proceed' || outcome === 'allow' ? outcome : 'cancel')

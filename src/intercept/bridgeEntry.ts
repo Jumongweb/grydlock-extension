@@ -14,14 +14,14 @@ window.addEventListener('message', (event) => {
 
   const message: RuntimeSignRequestMessage = {
     type: 'SIGN_REQUEST',
-    requestId: data.requestId,
+    requestId,
     xdr: data.xdr,
     networkPassphrase: data.networkPassphrase,
   }
 
   chrome.runtime.sendMessage(message, (response: RuntimeSignOutcomeMessage | undefined) => {
     window.postMessage(
-      { type: WINDOW_RESPONSE_TYPE, requestId: data.requestId, outcome: response?.outcome ?? 'cancel' },
+      { type: WINDOW_RESPONSE_TYPE, localId, outcome: response?.outcome ?? 'cancel' },
       '*',
     )
   })
