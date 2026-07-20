@@ -1,9 +1,11 @@
 import { Asset, FeeBumpTransaction, Networks, TransactionBuilder } from '@stellar/stellar-sdk'
 import type { OperationRecord } from '@stellar/stellar-sdk'
 
-export type DecodedDestination =
-  | { kind: 'payment'; destination: string; asset?: string }
-  | { kind: 'contractInvocation'; destination: string; function?: string }
+export interface DecodedDestination {
+  destination: string
+  asset?: string
+  memo?: { type: string; value: string }
+}
 
 interface OperationDestinations {
   destinations: string[]
@@ -13,6 +15,17 @@ interface OperationDestinations {
 function assetLabel(asset: Asset | undefined): string | undefined {
   if (!asset || asset.isNative()) return undefined
   return `${asset.getCode()}:${asset.getIssuer()}`
+}
+
+const NETWORK_MAP: Record<string, string> = {
+  PUBLIC: Networks.PUBLIC,
+  TESTNET: Networks.TESTNET,
+  FUTURENET: Networks.FUTURENET,
+  SANDBOX: Networks.SANDBOX,
+}
+
+export function resolveNetworkPassphrase(networkOrPassphrase: string = Networks.PUBLIC): string {
+  return NETWORK_MAP[networkOrPassphrase.toUpperCase()] ?? networkOrPassphrase
 }
 
 /**
@@ -54,27 +67,14 @@ function destinationsFor(op: OperationRecord): OperationDestinations {
 export function extractDestination(
   xdr: string,
   networkPassphrase: string = Networks.TESTNET,
-): DecodedDestination | null {
+): DecodedBatch | null {
   let parsed
   try {
-    parsed = TransactionBuilder.fromXDR(xdr, networkPassphrase)
-  } catch {
-    return null
-  }
+    const parsed = TransactionBuilder.fromXDR(xdr, networkPassphrase)
+    const tx = parsed instanceof FeeBumpTransaction ? parsed.innerTransaction : parsed
 
   const tx = parsed instanceof FeeBumpTransaction ? parsed.innerTransaction : parsed
-  return extractDecodedDestination(tx)
-}
-
-export function extractDecodedDestination(
-  rawTx: unknown,
-): DecodedDestination | null {
-  const tx = rawTx as Record<string, unknown>
-  const operations = (tx.operations as unknown[]) || []
-  const destinations = new Set<string>()
-  const kinds = new Set<'payment' | 'contractInvocation'>()
-  let asset: string | undefined
-  let functionName: string | undefined
+  const seen = new Map<string, string>()
 
   for (const op of tx.operations) {
     const resolved = destinationsFor(op)
@@ -83,13 +83,14 @@ export function extractDecodedDestination(
     asset = resolved.asset
   }
 
-  if (destinations.size !== 1 || kinds.size !== 1) {
+  if (seen.size === 0) {
     return null
   }
 
-  if (kinds.has('payment')) {
-    return { kind: 'payment', destination: [...destinations][0], asset }
+  return {
+    destinations: [...seen.entries()].map(([destination, asset]) => ({
+      destination,
+      asset: asset || undefined,
+    })),
   }
-
-  return { kind: 'contractInvocation', destination: [...destinations][0], function: functionName }
 }
