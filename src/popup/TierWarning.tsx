@@ -2,10 +2,16 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import type { TierInfo } from '../lib/tiers'
 
+interface DestinationRow {
+  destination: string
+  asset?: string
+  score: number
+}
+
 interface TierWarningProps {
   tier: TierInfo
   score: number
-  destination?: string
+  destinations?: DestinationRow[]
   onCancel: () => void
   onProceed: () => void
   devControl?: ReactNode
@@ -29,7 +35,7 @@ function focusableWithin(container: HTMLElement): HTMLElement[] {
 export default function TierWarning({
   tier,
   score,
-  destination,
+  destinations,
   onCancel,
   onProceed,
   devControl,

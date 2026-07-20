@@ -126,14 +126,14 @@ src/intercept/bridgeEntry.ts      (isolated world; only place with chrome.* API 
 src/background/background.ts      (service worker)
         │
         ├─▶ src/decode/decodeTransaction.ts → extractDestination(xdr)
-        │      no single destination? → outcome 'allow', nothing shown, request passes through
+        │      returns all distinct destinations, not just one
         │
-        ├─▶ src/adapter/oracleAdapter.ts → getScore(destination)
+        ├─▶ each destination scored independently via src/adapter/oracleAdapter.ts
         │
-        └─▶ chrome.windows.create(popup?mode=intercept&requestId&destination&score)
+        └─▶ worst-tier destination opens the popup with all destinations
                    │
                    ▼
-             src/popup/App.tsx (intercept mode) renders the tier + destination + Proceed/Cancel
+             src/popup/App.tsx (intercept mode) renders tier + worst-score + every destination
                    │  chrome.runtime.sendMessage({ type: 'DECISION_MADE', ... })
                    ▼
         background resolves the pending request → bridge → mainWorld
