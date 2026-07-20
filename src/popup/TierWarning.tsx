@@ -1,121 +1,218 @@
-import { addTrustedAddress } from '../utils/storageHelper';
-import type { CSSProperties, ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
-import type { TierInfo } from '../lib/tiers';
+import { useEffect, useId, useRef, useState } from 'react'
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
+import type { TierInfo } from '../lib/tiers'
+
+interface DestinationRow {
+  destination: string
+  asset?: string
+  score: number
+}
 
 interface TierWarningProps {
-  tier: TierInfo;
-  score: number;
-  destination?: string;
-  onCancel: () => void;
-  onProceed: () => void;
-  devControl?: ReactNode;
+  tier: TierInfo
+  score: number
+  destinations?: DestinationRow[]
+  onCancel: () => void
+  onProceed: () => void
+  devControl?: ReactNode
+}
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+function focusableWithin(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) => !el.hasAttribute('hidden') && el.getAttribute('aria-hidden') !== 'true',
+  )
 }
 
 export default function TierWarning({
   tier,
   score,
-  destination,
+  destinations,
   onCancel,
   onProceed,
   devControl,
 }: TierWarningProps) {
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const highConfirmId = useId()
+  const criticalConfirmId = useId()
+  const [highConfirmed, setHighConfirmed] = useState(false)
+  const [criticalConfirmation, setCriticalConfirmation] = useState('')
+  const requiresHighConfirmation = tier.tier === 'high'
+  const requiresCriticalConfirmation = tier.tier === 'critical'
+  const criticalPhrase = tier.label.toUpperCase()
+  const proceedEnabled =
+    !requiresHighConfirmation && !requiresCriticalConfirmation
+      ? true
+      : requiresHighConfirmation
+        ? highConfirmed
+        : criticalConfirmation.trim().toUpperCase() === criticalPhrase
 
-  // Focus the Cancel button on mount for accessibility
   useEffect(() => {
-    cancelRef.current?.focus();
-  }, []);
+    cancelRef.current?.focus()
+  }, [])
 
-  // Key handling for Escape and Tab navigation
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      onCancel();
-    } else if (e.key === 'Tab') {
-      const container = popupRef.current;
-      if (!container) return;
-      const focusable = focusableWithin(container);
-      if (focusable.length === 0) return;
-      e.preventDefault();
-      const current = document.activeElement as HTMLElement;
-      let idx = focusable.indexOf(current);
-      // If focus is outside the popup, start from before the first element
-      if (idx === -1) idx = e.shiftKey ? 0 : -1;
-      const step = e.shiftKey ? -1 : 1;
-      const nextIdx = (idx + step + focusable.length) % focusable.length;
-      focusable[nextIdx].focus();
-    }
-  };
-
-
-
-  // Global Tab handler to bring focus back if it escapes (helps JSDOM environment)
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Tab') {
-        const active = document.activeElement as HTMLElement;
-        if (popupRef.current && !popupRef.current.contains(active)) {
-          e.preventDefault();
-          cancelRef.current?.focus();
-        }
+    function handleDocumentKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== 'Tab' || !dialogRef.current) {
+        return
       }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, []);
 
-  const describedByIds = [
-    destination ? 'tier-warning-destination' : null,
-    'tier-warning-score',
-    'tier-warning-message',
-  ]
-    .filter(Boolean)
-    .join(' ');
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault()
+        cancelRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleDocumentKeyDown)
+    return () => document.removeEventListener('keydown', handleDocumentKeyDown)
+  }, [])
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      onCancel()
+      return
+    }
+
+    if (event.key !== 'Tab' || !dialogRef.current) {
+      return
+    }
+
+    const focusable = focusableWithin(dialogRef.current)
+    if (focusable.length === 0) {
+      return
+    }
+
+    const currentIndex = focusable.indexOf(document.activeElement as HTMLElement)
+    const nextIndex = event.shiftKey
+      ? currentIndex <= 0
+        ? focusable.length - 1
+        : currentIndex - 1
+      : currentIndex === -1 || currentIndex === focusable.length - 1
+        ? 0
+        : currentIndex + 1
+
+    event.preventDefault()
+    focusable[nextIndex].focus()
+  }
+
+  useEffect(() => {
+    cancelRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    function handleDocumentKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== 'Tab' || !dialogRef.current) {
+        return
+      }
+
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault()
+        cancelRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleDocumentKeyDown)
+    return () => document.removeEventListener('keydown', handleDocumentKeyDown)
+  }, [])
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      onCancel()
+      return
+    }
+
+    if (event.key !== 'Tab' || !dialogRef.current) {
+      return
+    }
+
+    const focusable = focusableWithin(dialogRef.current)
+    if (focusable.length === 0) {
+      return
+    }
+
+    const currentIndex = focusable.indexOf(document.activeElement as HTMLElement)
+    const nextIndex = event.shiftKey
+      ? currentIndex <= 0
+        ? focusable.length - 1
+        : currentIndex - 1
+      : currentIndex === -1 || currentIndex === focusable.length - 1
+        ? 0
+        : currentIndex + 1
+
+    event.preventDefault()
+    focusable[nextIndex].focus()
+  }
 
   return (
     <div
-      ref={popupRef}
+      ref={dialogRef}
       className="popup"
       data-tier={tier.tier}
       role="dialog"
       aria-modal="true"
       aria-labelledby="tier-warning-title"
-      aria-describedby={describedByIds}
-      style={{
-        '--tier-accent-light': tier.colour,
-        '--tier-accent-dark': tier.darkColour,
-      } as CSSProperties}
       onKeyDown={handleKeyDown}
+      style={
+        {
+          '--tier-accent-light': tier.colour,
+          '--tier-accent-dark': tier.darkColour,
+        } as CSSProperties
+      }
     >
       <h1 id="tier-warning-title" aria-live="assertive">
         <span className="tier-icon" aria-hidden="true">{tier.icon}</span>{' '}
         {tier.label} risk
       </h1>
-      {destination && (
-        <p id="tier-warning-destination" className="destination">
-          {destination}
+      {destination && <p className="destination">{destination}</p>}
+      {memo && (
+        <p className="memo">
+          <strong>Memo ({memo.type}):</strong> {memo.value}
         </p>
       )}
-      <p id="tier-warning-score" className="score">
-        Score: {score}
-      </p>
-      <p id="tier-warning-message" className="message">
-        {tier.message}
-      </p>
+      <p className="score">Score: {score}</p>
+      {secondsLeft !== null && <p className="expires-in">Expires in {secondsLeft}s</p>}
+      <p className="message">{tier.message}</p>
+      {requiresHighConfirmation && (
+        <label className="confirmation-panel confirmation-check" htmlFor={highConfirmId}>
+          <input
+            id={highConfirmId}
+            type="checkbox"
+            checked={highConfirmed}
+            onChange={(event) => setHighConfirmed(event.target.checked)}
+          />
+          <span>I understand this destination shows strong risk signals.</span>
+        </label>
+      )}
+      {requiresCriticalConfirmation && (
+        <div className="confirmation-panel">
+          <label htmlFor={criticalConfirmId}>
+            Type <strong>{criticalPhrase}</strong> to enable Proceed.
+          </label>
+          <input
+            id={criticalConfirmId}
+            className="confirmation-input"
+            type="text"
+            value={criticalConfirmation}
+            onChange={(event) => setCriticalConfirmation(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+      )}
       <div className="actions">
         <button className="cancel" onClick={onCancel} ref={cancelRef}>
           Cancel
         </button>
-        {destination && (tier.tier === 'low' || tier.tier === 'elevated') && (
-          <button className="trust" onClick={() => addTrustedAddress(destination)}>
-            Trust this destination
-          </button>
-        )}
-        <button className="proceed" onClick={onProceed}>
+        <button className="proceed" onClick={onProceed} disabled={!proceedEnabled}>
           Proceed
         </button>
       </div>
