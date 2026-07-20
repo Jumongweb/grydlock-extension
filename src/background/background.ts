@@ -12,9 +12,11 @@ import type {
 
 type IncomingMessage = RuntimeSignRequestMessage | RuntimeDecisionMadeMessage
 
-const pendingDecisions = new Map<string, (decision: Decision) => void>()
+export const DEFAULT_TIMEOUT_MS = 60_000
 
-function requestDecision(
+export const pendingDecisions = new Map<string, (decision: Decision) => void>()
+
+export function requestDecision(
   requestId: string,
   info: { destinations: { destination: string; asset?: string }[]; scores: Array<{ destination: string; asset?: string; score: number }>; worstScore: number },
 ): Promise<Decision> {
@@ -164,13 +166,14 @@ chrome.runtime.onMessage.addListener((message: IncomingMessage, sender, sendResp
       sendResponse(response)
     })
 
-    return true
-  }
+      return true
+    }
 
   if (message.type === 'DECISION_MADE') {
     const resolve = pendingDecisions.get(message.requestId)
     resolve?.(message.decision)
   }
 
-  return undefined
-})
+    return undefined
+  })
+}

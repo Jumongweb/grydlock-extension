@@ -177,6 +177,7 @@ export default function TierWarning({
       </h1>
       {destination && <p className="destination">{destination}</p>}
       <p className="score">Score: {score}</p>
+      {secondsLeft !== null && <p className="expires-in">Expires in {secondsLeft}s</p>}
       <p className="message">{tier.message}</p>
       {requiresHighConfirmation && (
         <label className="confirmation-panel confirmation-check" htmlFor={highConfirmId}>

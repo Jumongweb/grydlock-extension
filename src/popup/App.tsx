@@ -80,6 +80,8 @@ function InterceptView({ params }: { params: URLSearchParams }) {
   const requestId = params.get('requestId') ?? ''
   const destinationsJson = params.get('destinations')
   const score = Number(params.get('score') ?? '0')
+  const expiresAtParam = params.get('expiresAt')
+  const expiresAt = expiresAtParam ? Number(expiresAtParam) : undefined
   const tier = tierForScore(score)
 
   let destinations: DestinationRow[] = []
