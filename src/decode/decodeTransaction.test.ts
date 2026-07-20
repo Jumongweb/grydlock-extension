@@ -9,13 +9,14 @@ const DEST_B = Keypair.random().publicKey()
 const ISSUER = Keypair.random().publicKey()
 const BALANCE_ID = '00000000da0d57da7d4850e7fc10d2a9d0ebc731f7afb40574c03395b17d49149b91f5be'
 
-function buildXdr(operations: ReturnType<typeof Operation.payment>[]) {
+function buildXdr(operations: ReturnType<typeof Operation.payment>[], memo?: Memo) {
   const account = new Account(SOURCE, '0')
   const builder = new TransactionBuilder(account, {
     fee: '100',
     networkPassphrase: Networks.TESTNET,
   })
   for (const op of operations) builder.addOperation(op)
+  if (memo) builder.addMemo(memo)
   return builder.setTimeout(30).build().toXDR()
 }
 
@@ -305,6 +306,35 @@ describe('extractDestination', () => {
         ),
         { numRuns: 100 },
       )
+    })
+  })
+
+  describe('memo extraction', () => {
+    it('returns undefined memo when none is present', () => {
+      const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' })])
+      expect(extractDestination(xdr, Networks.TESTNET)?.memo).toBeUndefined()
+    })
+
+    it('extracts a text memo', () => {
+      const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' })], Memo.text('hello'))
+      expect(extractDestination(xdr, Networks.TESTNET)?.memo).toEqual({ type: 'text', value: 'hello' })
+    })
+
+    it('extracts an id memo', () => {
+      const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' })], Memo.id('12345'))
+      expect(extractDestination(xdr, Networks.TESTNET)?.memo).toEqual({ type: 'id', value: '12345' })
+    })
+
+    it('extracts a hash memo as hex string', () => {
+      const hashHex = '0000000000000000000000000000000000000000000000000000000000000000'
+      const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' })], Memo.hash(hashHex))
+      expect(extractDestination(xdr, Networks.TESTNET)?.memo).toEqual({ type: 'hash', value: hashHex })
+    })
+
+    it('extracts a return memo as hex string', () => {
+      const returnHex = '1111111111111111111111111111111111111111111111111111111111111111'
+      const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' })], Memo.return(returnHex))
+      expect(extractDestination(xdr, Networks.TESTNET)?.memo).toEqual({ type: 'return', value: returnHex })
     })
   })
 })

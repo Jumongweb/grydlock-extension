@@ -4,6 +4,7 @@ import type { OperationRecord } from '@stellar/stellar-sdk'
 export interface DecodedDestination {
   destination: string
   asset?: string
+  memo?: { type: string; value: string }
 }
 
 interface OperationDestinations {

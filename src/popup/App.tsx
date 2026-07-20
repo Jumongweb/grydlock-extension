@@ -83,6 +83,10 @@ function InterceptView({ params }: { params: URLSearchParams }) {
   const expiresAtParam = params.get('expiresAt')
   const expiresAt = expiresAtParam ? Number(expiresAtParam) : undefined
   const tier = tierForScore(score)
+  
+  const memoType = params.get('memoType')
+  const memoValue = params.get('memoValue')
+  const memo = memoType && memoValue ? { type: memoType, value: memoValue } : undefined
 
   let destinations: DestinationRow[] = []
   if (destinationsJson) {

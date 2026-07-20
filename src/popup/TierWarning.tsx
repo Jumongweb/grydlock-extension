@@ -176,6 +176,11 @@ export default function TierWarning({
         {tier.label} risk
       </h1>
       {destination && <p className="destination">{destination}</p>}
+      {memo && (
+        <p className="memo">
+          <strong>Memo ({memo.type}):</strong> {memo.value}
+        </p>
+      )}
       <p className="score">Score: {score}</p>
       {secondsLeft !== null && <p className="expires-in">Expires in {secondsLeft}s</p>}
       <p className="message">{tier.message}</p>
