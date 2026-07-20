@@ -58,10 +58,8 @@ export function extractDestination(
 ): DecodedBatch | null {
   let parsed
   try {
-    parsed = TransactionBuilder.fromXDR(xdr, networkPassphrase)
-  } catch {
-    return null
-  }
+    const parsed = TransactionBuilder.fromXDR(xdr, networkPassphrase)
+    const tx = parsed instanceof FeeBumpTransaction ? parsed.innerTransaction : parsed
 
   const tx = parsed instanceof FeeBumpTransaction ? parsed.innerTransaction : parsed
   const seen = new Map<string, string>()
