@@ -223,6 +223,12 @@ that unit tests cannot provide:
 - `src/popup/main.tsx` — React entry-point boilerplate.
 - `src/intercept/protocol.ts` — constant and type definitions only.
 
+## Timeout Behavior for getScore
+
+`getScore` now includes a built‑in timeout to prevent the signing flow from hanging indefinitely. The default timeout is **5 seconds** and can be overridden per call via the optional `options` parameter. If the operation exceeds the timeout, the function resolves with a fallback score of `-1`, which is treated as an unknown score and results in a safe warning tier.
+
+You can configure the default timeout by modifying `src/adapter/config.ts` (`DEFAULT_GET_SCORE_TIMEOUT_MS`). Tests use a shorter timeout to verify the fallback behaviour.
+
 ## Roadmap
 
 - [x] Popup renders one score across the four tiers. _(stub)_
