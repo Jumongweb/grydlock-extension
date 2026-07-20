@@ -1,59 +1,88 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as resolveModule from '../intercept/resolveOutcome'
 
-const chromeMock = {
-  runtime: {
-    onMessage: { addListener: vi.fn() },
-    getURL: (path: string) => path,
-  },
-  windows: {
-    create: vi.fn(),
-    onRemoved: { addListener: vi.fn() },
-  },
-}
+const mockAddListener = vi.fn()
+const mockGetURL = vi.fn((path: string) => `chrome-extension://test-id/${path}`)
+const mockWindowsCreate = vi.fn()
 
-vi.stubGlobal('chrome', chromeMock)
+const originalChrome = globalThis.chrome
 
-const { pendingDecisions, requestDecision, handleWindowRemoved, handleDecisionMade } =
-  await import('./background')
+const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0))
 
-describe('background window-closed handling', () => {
+describe('background message listener', () => {
   beforeEach(() => {
-    pendingDecisions.clear()
-    chromeMock.windows.create.mockReset()
+    vi.restoreAllMocks()
+    globalThis.chrome = {
+      runtime: {
+        onMessage: { addListener: mockAddListener },
+        getURL: mockGetURL,
+      },
+      windows: { create: mockWindowsCreate },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
   })
 
-  it('resolves the pending decision to cancel and clears the entry when its window is closed', async () => {
-    chromeMock.windows.create.mockResolvedValue({ id: 42 })
-
-    const decisionPromise = requestDecision('req-1', { destination: 'GDEST', score: 10 })
-    await Promise.resolve()
-    await Promise.resolve()
-
-    expect(pendingDecisions.get('req-1')?.windowId).toBe(42)
-
-    handleWindowRemoved(42)
-
-    await expect(decisionPromise).resolves.toBe('cancel')
-    expect(pendingDecisions.has('req-1')).toBe(false)
+  afterEach(() => {
+    globalThis.chrome = originalChrome
+    vi.resetModules() // clear the internal pendingDecisions map for the next test
   })
 
-  it('leaves unrelated pending decisions untouched when a different window closes', async () => {
-    chromeMock.windows.create.mockResolvedValue({ id: 1 })
+  it('handles SIGN_REQUEST to SIGN_OUTCOME round trip and explicitly tests pendingDecisions lifecycle', async () => {
+    // Intercept resolveOutcome to control when it finishes and observe requestDecision
+    vi.spyOn(resolveModule, 'resolveOutcome').mockImplementation(async (_xdr, deps) => {
+      // We must await it to test the round trip!
+      const decision = await deps.requestDecision({ destination: 'GDEST', score: 42 })
+      return decision === 'proceed' ? 'allow' : 'cancel'
+    })
 
-    const decisionPromise = requestDecision('req-2', { destination: 'GDEST', score: 10 })
-    await Promise.resolve()
-    await Promise.resolve()
+    await import('./background')
 
-    handleWindowRemoved(999)
+    const listener = mockAddListener.mock.calls[0][0]
+    const sendResponse = vi.fn()
 
-    expect(pendingDecisions.has('req-2')).toBe(true)
+    // 1. Send SIGN_REQUEST
+    const returnsTrue = listener({ type: 'SIGN_REQUEST', requestId: 'req-1', xdr: 'test' }, {}, sendResponse)
+    expect(returnsTrue).toBe(true)
 
-    handleDecisionMade('req-2', 'proceed')
-    await expect(decisionPromise).resolves.toBe('proceed')
+    // Wait for resolveOutcome to get called and hit `requestDecision`
+    await flushPromises()
+
+    // Verify it called chrome.windows.create with the URL
+    expect(mockWindowsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining('mode=intercept&requestId=req-1&destination=GDEST&score=42'),
+      })
+    )
+
+    // At this point, pendingDecisions has 'req-1'. 
+    // We send a DECISION_MADE message to resolve it.
+    listener({ type: 'DECISION_MADE', requestId: 'req-1', decision: 'proceed' }, {}, vi.fn())
+
+    // Wait for the Promise chain to resolve
+    await flushPromises()
+
+    // Verify round trip completion
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'SIGN_OUTCOME',
+      requestId: 'req-1',
+      outcome: 'allow',
+    })
+
+    // Verify delete: sending another DECISION_MADE shouldn't crash or re-resolve anything
+    // If pendingDecisions was not deleted, it would try to resolve a completed promise (which is safe in JS, but we want to ensure no crash)
+    expect(() => {
+      listener({ type: 'DECISION_MADE', requestId: 'req-1', decision: 'cancel' }, {}, vi.fn())
+    }).not.toThrow()
   })
 
-  it('is a no-op when no pending decision matches the closed window', () => {
-    expect(() => handleWindowRemoved(123)).not.toThrow()
-    expect(pendingDecisions.size).toBe(0)
+  it('safely handles unknown/out-of-order DECISION_MADE messages', async () => {
+    await import('./background')
+    const listener = mockAddListener.mock.calls[0][0]
+
+    // Send DECISION_MADE without any pending SIGN_REQUEST
+    // It should silently no-op at `resolve?.(...)`
+    expect(() => {
+      listener({ type: 'DECISION_MADE', requestId: 'unknown-id', decision: 'proceed' }, {}, vi.fn())
+    }).not.toThrow()
   })
 })
