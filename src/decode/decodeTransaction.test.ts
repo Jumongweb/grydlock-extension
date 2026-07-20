@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { Account, Asset, Claimant, Keypair, Networks, Operation, TransactionBuilder } from '@stellar/stellar-sdk'
 import { extractDestination } from './decodeTransaction'
@@ -336,5 +335,102 @@ describe('extractDestination', () => {
       const xdr = buildXdr([Operation.payment({ destination: DEST_A, asset: Asset.native(), amount: '10' })], Memo.return(returnHex))
       expect(extractDestination(xdr, Networks.TESTNET)?.memo).toEqual({ type: 'return', value: returnHex })
     })
+  })
+})
+
+describe('extractDecodedDestination', () => {
+  it('extracts contract address and function from invokeContract operations', () => {
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: {
+                  contractAddress: DEST_A,
+                  functionName: 'transfer',
+                  args: [] as never[],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(extractDecodedDestination(fakeTx)).toEqual({
+      kind: 'contractInvocation',
+      destination: DEST_A,
+      function: 'transfer',
+    })
+  })
+
+  it('returns null when invokeHostFunction has no invokeContract function', () => {
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              { type: 'uploadContractWasm', uploadContractWasm: { wasm: 'abc-wasm' } },
+            ],
+          },
+        },
+      ],
+    }
+    expect(extractDecodedDestination(fakeTx)).toBeNull()
+  })
+
+  it('returns null when invokeContract provides no contractAddress', () => {
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: {
+                  functionName: 'transfer',
+                  args: [] as never[],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(extractDecodedDestination(fakeTx)).toBeNull()
+  })
+
+  it('returns null when multiple distinct contract destinations appear', () => {
+    const fakeTx = {
+      operations: [
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: { contractAddress: DEST_A, functionName: 'transfer', args: [] as never[] },
+              },
+            ],
+          },
+        },
+        {
+          type: 'invokeHostFunction',
+          hostFunction: {
+            functions: [
+              {
+                type: 'invokeContract',
+                invokeContract: { contractAddress: DEST_B, functionName: 'approve', args: [] as never[] },
+              },
+            ],
+          },
+        },
+      ],
+    }
+    expect(extractDecodedDestination(fakeTx)).toBeNull()
   })
 })

@@ -8,6 +8,7 @@ import type {
   RuntimeDecisionMadeMessage,
   RuntimeSignOutcomeMessage,
   RuntimeSignRequestMessage,
+  RuntimeSignRequestInfo,
 } from '../intercept/protocol'
 
 type IncomingMessage = RuntimeSignRequestMessage | RuntimeDecisionMadeMessage

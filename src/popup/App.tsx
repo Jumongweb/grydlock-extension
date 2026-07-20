@@ -107,6 +107,15 @@ function InterceptView({ params }: { params: URLSearchParams }) {
     window.close();
   }
 
+  const displayDestination =
+    kind === 'contractInvocation'
+      ? functionName
+        ? `Contract Invocation: ${functionName}() @ ${destination}`
+        : `Contract Invocation @ ${destination}`
+      : asset
+        ? `${destination} (${asset})`
+        : destination
+
   return (
     <TierWarning
       tier={tier}
