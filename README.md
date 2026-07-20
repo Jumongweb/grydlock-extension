@@ -12,6 +12,8 @@
 
 This is the product. It runs entirely in the user's browser. It hooks the wallet signing flow, decodes the pending transaction, requests a risk score for the destination, and renders a four-tier warning. It never blocks — it warns, and the user decides.
 
+For detailed information on data handling, data protection, and our no-telemetry architecture, see [PRIVACY.md](file:///c:/Users/USER/grydlock-extension/PRIVACY.md).
+
 > **Status:** Early build. A Freighter `signTransaction` proxy decodes the destination, routes it through the oracle adapter, and shows the warning before signing. A live oracle connection is **not yet built** — see the roadmap.
 
 ## What it does
